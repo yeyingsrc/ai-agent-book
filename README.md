@@ -77,10 +77,13 @@ git clone https://github.com/bojieli/lighteval.git                     chapter7/
 # 第 9 章 · 浏览器自动化与 Claude 示例
 git clone https://github.com/browser-use/browser-use.git               chapter9/browser-use
 git clone https://github.com/anthropics/claude-quickstarts.git         chapter9/claude-quickstarts
+
+# 第 10 章 · 双 Agent 架构（已独立为 TalkAct 项目）
+git clone https://github.com/19PINE-AI/TalkAct.git                     chapter10/use-computer-while-calling
 ```
 
 > 各项目 README 中如标注了特定提交（commit），请按其说明 `git checkout` 到对应版本，以保证复现结果一致。
-> 第 10 章 `use-computer-while-calling` 体积较大（内含 vendored 依赖），暂未纳入本仓库，请参考该目录 README 单独获取。
+> 第 10 章 `use-computer-while-calling` 已发展为持续维护的独立仓库 [19PINE-AI/TalkAct](https://github.com/19PINE-AI/TalkAct)，本仓库仅保留一份指向它的说明文档（`chapter10/use-computer-while-calling/README.md`）。
 
 ## 🚀 第 1 章 · Agent 基础知识
 
@@ -543,7 +546,7 @@ Claude API 的快速入门示例和最佳实践，涵盖各种使用场景。
 ## 🤝 第 10 章 · 多 Agent 协作
 
 ### use-computer-while-calling - 双 Agent 架构
-`chapter10/use-computer-while-calling/`
+`chapter10/use-computer-while-calling/`（📖 完整代码已独立为 [19PINE-AI/TalkAct](https://github.com/19PINE-AI/TalkAct)，本目录仅保留说明文档）
 
 实现电话呼叫 Agent 和计算机使用 Agent 的双 Agent 协作架构。两个 Agent 通过 WebSocket 直接通信，无需协调器。电话 Agent 处理语音交互，计算机 Agent 执行浏览器自动化，并行工作完成需要语音和网页操作的复杂任务。
 
