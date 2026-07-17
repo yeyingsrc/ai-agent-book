@@ -5,6 +5,8 @@ results/
 .*
 !.github
 !.github/**
+!.gitignore
+!.env.example
 *.log
 out/
 output/
@@ -12,4 +14,7 @@ user-memory/data/
 document_store.json
 trajectory.json
 arena_data.json
+last_run.json
 *.wav
+*.mp3
+*.mp4

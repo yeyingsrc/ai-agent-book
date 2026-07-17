@@ -44,11 +44,11 @@ def build_client_and_model():
         raise SystemExit("未找到 OPENAI_API_KEY，请先在环境变量或 .env 中设置。")
     base_url = os.getenv("OPENAI_BASE_URL")
     model = os.getenv("MODEL", "gpt-4o-mini")
-    client = (
-        OpenAI(api_key=api_key, base_url=base_url)
-        if base_url
-        else OpenAI(api_key=api_key)
-    )
+    # timeout / max_retries：让偶发的网络/SSL 抖动自动重试，不至于整轮崩溃
+    client_kwargs = {"api_key": api_key, "timeout": 60.0, "max_retries": 3}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    client = OpenAI(**client_kwargs)
     return client, model
 
 

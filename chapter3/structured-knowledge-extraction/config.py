@@ -30,6 +30,9 @@ def get_client() -> OpenAI:
             "未找到 OPENAI_API_KEY，请先 `cp env.example .env` 并填入你的 OpenAI Key。"
         )
     base_url = os.getenv("OPENAI_BASE_URL")  # 一般不需要设置
+    # timeout + 自动重试：抽取阶段要连续发几十次请求，单次瞬时错误（网络抖动/
+    # 限流/5xx）不应中断整条流水线。
+    kwargs = dict(api_key=api_key, timeout=60.0, max_retries=2)
     if base_url:
-        return OpenAI(api_key=api_key, base_url=base_url)
-    return OpenAI(api_key=api_key)
+        kwargs["base_url"] = base_url
+    return OpenAI(**kwargs)

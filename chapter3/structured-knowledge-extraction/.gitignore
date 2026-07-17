@@ -1,0 +1,4 @@
+# 生成的抽取缓存与训练产物（运行 demo.py 时自动生成，不应入库）。
+# 注意：data/cases.jsonl 是自带的小样本合成数据集，需保留入库。
+data/extracted.jsonl
+data/factor_model.json

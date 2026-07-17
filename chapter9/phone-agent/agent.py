@@ -22,7 +22,21 @@ from openai import OpenAI
 from pine_voice import make_phone_call
 
 _MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-_client = OpenAI(base_url=os.getenv("OPENAI_BASE_URL") or None)
+
+# 延迟创建 client：缺 OPENAI_API_KEY 时由 demo.py 给出友好提示，而非 import 期裸异常。
+# timeout + 自动重试，避免单次网络/SSL 抖动让整轮 ReAct 崩溃。
+_client = None
+
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        _client = OpenAI(
+            base_url=os.getenv("OPENAI_BASE_URL") or None,
+            timeout=60.0,
+            max_retries=3,
+        )
+    return _client
 
 # 最多允许 Agent 发起几次工具调用（含追问/再拨），防止死循环。
 _MAX_STEPS = 6
@@ -101,7 +115,7 @@ def run_agent(task: str, on_event: Callable[[str, Any], None] | None = None) -> 
     ]
 
     for _ in range(_MAX_STEPS):
-        resp = _client.chat.completions.create(
+        resp = _get_client().chat.completions.create(
             model=_MODEL,
             messages=messages,
             tools=_TOOLS,
@@ -152,7 +166,7 @@ def run_agent(task: str, on_event: Callable[[str, Any], None] | None = None) -> 
             "content": "请根据以上通话记录，立即给用户一份最终汇报，不要再打电话了。",
         }
     )
-    resp = _client.chat.completions.create(
+    resp = _get_client().chat.completions.create(
         model=_MODEL, messages=messages, temperature=0.3
     )
     final = resp.choices[0].message.content or ""

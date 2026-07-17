@@ -2,7 +2,7 @@
 实验 5-3 主程序：控制组（纯自然语言规则） vs 实验组（代码化规则三重保障）
 
 跑法：
-    python demo.py            # 跑全部 7 个 case，两组对比
+    python demo.py            # 跑全部 8 个 case，两组对比
     python demo.py --quick    # 只跑前 4 个 case（省钱快看）
     python demo.py -v         # 打印每步工具调用
 
@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 try:
@@ -138,6 +139,9 @@ def main():
     ap.add_argument("--quick", action="store_true", help="只跑前 4 个 case")
     ap.add_argument("-v", "--verbose", action="store_true", help="打印每步工具调用")
     args = ap.parse_args()
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        sys.exit("错误：未设置 OPENAI_API_KEY，请复制 env.example 为 .env 并填入，或直接 export。")
 
     tasks = TASKS[:4] if args.quick else TASKS
     print(f"实验 5-3：小模型通过代码化知识提升执行规则的准确性")

@@ -32,7 +32,21 @@ from openai import OpenAI
 
 # 只使用 OPENAI_API_KEY（可选 OPENAI_BASE_URL 指向兼容网关）。
 _MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-_client = OpenAI(base_url=os.getenv("OPENAI_BASE_URL") or None)
+
+# 延迟创建 client：缺 OPENAI_API_KEY 时由 demo.py 给出友好提示，而非 import 期裸异常。
+# timeout + 自动重试，避免单次网络/SSL 抖动让整段模拟通话崩溃。
+_client = None
+
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        _client = OpenAI(
+            base_url=os.getenv("OPENAI_BASE_URL") or None,
+            timeout=60.0,
+            max_retries=3,
+        )
+    return _client
 
 # 一次模拟通话里「去电语音 Agent ↔ 被叫方」最多来回的轮数（一轮 = 双方各说一次）。
 _MAX_TURNS = 8
@@ -66,7 +80,7 @@ class CallRecord:
 # 内部：调用 OpenAI 生成一次发言
 # --------------------------------------------------------------------------- #
 def _chat(messages: list[dict[str, str]], temperature: float = 0.7) -> str:
-    resp = _client.chat.completions.create(
+    resp = _get_client().chat.completions.create(
         model=_MODEL,
         messages=messages,
         temperature=temperature,

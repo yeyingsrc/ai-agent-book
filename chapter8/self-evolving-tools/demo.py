@@ -20,7 +20,19 @@ TASK_2 = "查询 Apple(股票代码 AAPL) 的最新股价，以及与一周前�
 
 
 def main():
-    agent = SelfEvolvingAgent(verbose=True)
+    try:
+        agent = SelfEvolvingAgent(verbose=True)
+    except RuntimeError as e:
+        print(f"[配置错误] {e}", file=sys.stderr)
+        print(
+            "请先配置对应供应商的 API Key（默认 OpenAI）：\n"
+            "  cp env.example .env  然后在 .env 中填入 OPENAI_API_KEY；\n"
+            "  或直接 export OPENAI_API_KEY=sk-...\n"
+            "如需切换供应商：export LLM_PROVIDER=moonshot|ark 并配置对应的 "
+            "MOONSHOT_API_KEY / ARK_API_KEY。",
+            file=sys.stderr,
+        )
+        return 2
 
     # ---------- 任务一：从零进化 ----------
     print("\n########## 任务一：NVDA（演示 搜索→测试→封装→用）##########")

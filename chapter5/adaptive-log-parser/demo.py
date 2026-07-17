@@ -152,6 +152,8 @@ def main() -> None:
     hr("自适应日志解析系统 —— 自愈闭环演示（实验 5-7）")
     print("初始系统只内置一个基础解析器：JSON 行解析器。")
 
+    os.makedirs(PARSERS_DIR, exist_ok=True)  # 确保持久化目录存在（新克隆时可能只有 .gitkeep）
+
     engine = LogParserEngine()
     engine.register("builtin_json", builtin_json_parser)
     print(f"当前已注册解析器：{engine.parser_names}")

@@ -77,7 +77,11 @@ class CodeGenAgent:
         if not api_key:
             raise SystemExit("未找到 OPENAI_API_KEY，请在环境变量或 .env 中设置。")
         base_url = os.getenv("OPENAI_BASE_URL")
-        self.client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+        # timeout / max_retries：让偶发的网络/SSL 抖动自动重试，不至于整轮崩溃
+        client_kwargs = {"api_key": api_key, "timeout": 60.0, "max_retries": 3}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        self.client = OpenAI(**client_kwargs)
         self.model = model or os.getenv("MODEL", "gpt-4o-mini")
 
     def generate_parser_code(

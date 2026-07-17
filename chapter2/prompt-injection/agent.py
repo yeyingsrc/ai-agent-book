@@ -266,5 +266,12 @@ def make_client() -> tuple[OpenAI, str]:
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     # 允许自定义 base_url（默认官方），但请勿指向已失效的第三方网关。
     base_url = os.getenv("OPENAI_BASE_URL") or None
-    client = OpenAI(api_key=api_key, base_url=base_url)
+    # timeout + 自动重试：应对偶发的网络抖动 / 限流 / 5xx，避免单次瞬时错误
+    # 直接让整张成功率矩阵作废。
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        timeout=60.0,
+        max_retries=2,
+    )
     return client, model

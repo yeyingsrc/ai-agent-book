@@ -67,14 +67,21 @@ Coding Agent（`coding_agent.py`）不整篇重写，而是像真实编程 Agent
 ```bash
 pip install -r requirements.txt
 cp env.example .env      # 填入 OPENAI_API_KEY
-python demo.py
+python demo.py           # 完整运行：10 个用例 × 3 份 prompt
+python demo.py --quick   # 快速演示：每组只取 2 个用例，省时省钱（推荐先跑这个）
 ```
 
-默认模型 `gpt-4o-mini`，温度 0（结果可复现）。跑完 10 个用例 × 3 份 prompt，约几十次 API 调用。
+默认模型 `gpt-4o-mini`（读取 `OPENAI_API_KEY`），温度 0（结果可复现）。完整运行跑
+10 个用例 × 3 份 prompt，约几十次 API 调用、数分钟；`--quick`（或 `--limit N` 指定每组
+用例数）会显著缩短耗时，用于快速验证闭环。若未设置对应 API Key，程序会打印清晰的中文
+错误提示并退出，而不是抛出堆栈。
+
+优化后的工作副本会写入 `runtime/system_prompt_working.txt`（每次运行自动重置，属生成
+工件，已被 `.gitignore` 忽略）。
 
 ## 5. 真实运行结论
 
-下表为一次真实运行（`gpt-4o-mini`）的结果（完整日志见 `runtime/demo_run.log`）：
+下表为一次真实运行（`gpt-4o-mini`，完整 10 用例）的结果：
 
 ```
 正确率对比（保留任务集 = 既有正确行为不能退化；边界案例集 = 过度转接应改善）

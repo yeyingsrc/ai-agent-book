@@ -83,7 +83,12 @@ def print_matrix(matrix: list[list[float]]) -> None:
 
 def main() -> int:
     trials = int(os.getenv("TRIALS", "4"))
-    matrix = run_matrix(trials)
+    try:
+        matrix = run_matrix(trials)
+    except RuntimeError as exc:
+        # 常见于未配置 OPENAI_API_KEY：给出清晰的人类可读提示而非原始堆栈。
+        print(f"启动失败：{exc}", file=sys.stderr)
+        return 1
     print_matrix(matrix)
     print(
         "\n结论：从 D1 到 D4，随着防御逐层加强（提示词加固 -> 来源标记 -> "

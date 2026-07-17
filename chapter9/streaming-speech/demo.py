@@ -75,7 +75,8 @@ def check_prereqs():
 
 def get_client():
     from openai import OpenAI
-    return OpenAI()  # 自动读取 OPENAI_API_KEY
+    # 自动读取 OPENAI_API_KEY；timeout + 自动重试，避免单次网络抖动整段崩溃
+    return OpenAI(timeout=60.0, max_retries=3)
 
 
 def synth_audio(client) -> None:

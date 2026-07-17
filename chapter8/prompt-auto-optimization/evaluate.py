@@ -84,14 +84,20 @@ def evaluate_case(system_prompt: str, case: dict, verbose: bool = False) -> dict
     return out
 
 
-def evaluate_prompt(system_prompt: str, label: str = "", verbose: bool = True) -> dict:
-    """在全部用例上评测一份 prompt，返回分组正确率与明细。"""
+def evaluate_prompt(system_prompt: str, label: str = "", verbose: bool = True, cases=None) -> dict:
+    """在全部用例上评测一份 prompt，返回分组正确率与明细。
+
+    cases 为 None 时评测全部用例；也可传入用例子集（如 --quick 模式）以控制成本。
+    """
     from airline_env import CASES
+
+    if cases is None:
+        cases = CASES
 
     if verbose and label:
         print(f"\n>>> 评测 [{label}]")
     results = []
-    for case in CASES:
+    for case in cases:
         results.append(evaluate_case(system_prompt, case, verbose=verbose))
 
     def _acc(group):

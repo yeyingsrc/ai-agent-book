@@ -37,7 +37,9 @@ def main():
         print("未检测到 OPENAI_API_KEY，请先 export OPENAI_API_KEY=sk-...", file=sys.stderr)
         sys.exit(1)
 
-    client = OpenAI()
+    # timeout + 自动重试：本 demo 会连续发几十次请求，单次瞬时错误（网络抖动/
+    # 限流/5xx）不应中断整条成本拆解流程。
+    client = OpenAI(timeout=60.0, max_retries=2)
 
     print(f"模型: {MODEL}")
     print(f"单价(每百万token): 输入 ${PRICE_INPUT_PER_M} / 缓存输入 ${PRICE_CACHED_PER_M} "

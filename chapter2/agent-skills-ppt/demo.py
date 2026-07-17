@@ -27,6 +27,14 @@ from pathlib import Path
 from openai import OpenAI
 from pptx import Presentation
 
+# 从同目录 .env 读取 OPENAI_API_KEY（若安装了 python-dotenv）
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
+
 # ---------------------------------------------------------------------------
 # 路径与配置
 # ---------------------------------------------------------------------------
@@ -212,7 +220,8 @@ def run_agent() -> Path | None:
         log("错误：未设置 OPENAI_API_KEY，请先 export OPENAI_API_KEY=sk-...")
         sys.exit(1)
 
-    client = OpenAI()
+    # timeout + 自动重试：单次网络/SSL 抖动不至于让整个 agentic loop 崩溃
+    client = OpenAI(timeout=60.0, max_retries=3)
     catalog = scan_skill_catalog()
 
     system_prompt = build_system_prompt(catalog)

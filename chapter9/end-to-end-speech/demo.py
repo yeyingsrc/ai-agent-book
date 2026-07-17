@@ -135,7 +135,8 @@ def main() -> int:
               "OpenAI Key。", file=sys.stderr)
         return 1
 
-    client = OpenAI(api_key=api_key)
+    # timeout + 自动重试：单次网络/SSL 抖动不至于让整条流水线崩溃
+    client = OpenAI(api_key=api_key, timeout=60.0, max_retries=3)
     AUDIO_DIR.mkdir(exist_ok=True)
     question_audio = str(AUDIO_DIR / "user_question.mp3")
     answer_audio = str(AUDIO_DIR / "assistant_answer.mp3")

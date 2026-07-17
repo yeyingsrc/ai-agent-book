@@ -16,6 +16,7 @@
 
 import os
 import glob
+import sys
 
 from dotenv import load_dotenv
 
@@ -74,6 +75,11 @@ def print_consistency(analysis, label):
 
 
 def main():
+    if not os.environ.get("OPENAI_API_KEY"):
+        print("错误：未设置 OPENAI_API_KEY。请先 `export OPENAI_API_KEY=...` "
+              "或复制 env.example 为 .env 并填写（见 env.example）。", file=sys.stderr)
+        sys.exit(1)
+
     chapters = load_chapters()
     print(f"载入 {len(chapters)} 个章节：{list(chapters.keys())}")
 

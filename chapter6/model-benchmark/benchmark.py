@@ -215,7 +215,16 @@ def benchmark_provider(
     timeout: float,
 ) -> ProviderSummary:
     """对单个提供商发起 num_requests 次请求（并发 concurrency）。"""
-    client = OpenAI(api_key=cfg.api_key(), base_url=cfg.base_url)
+    # 这是延迟基准：显式关闭 SDK 自动重试（max_retries=0），让一次超时/挂起的
+    # 请求被如实记为「失败」（计入可用性下降），而不是被静默重试从而拉高延迟、
+    # 掩盖真实故障。每次请求仍带 per-call timeout（见 measure_once）。
+    # 再加一个客户端级 timeout 作为兜底，避免个别请求永久挂起拖死线程池。
+    client = OpenAI(
+        api_key=cfg.api_key(),
+        base_url=cfg.base_url,
+        timeout=timeout,
+        max_retries=0,
+    )
     results: list[RequestResult] = []
 
     if concurrency <= 1:

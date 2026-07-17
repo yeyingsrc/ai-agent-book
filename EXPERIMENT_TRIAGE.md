@@ -79,5 +79,6 @@
 ## 待决策（需作者拍板）
 
 1. ~~7-4 VLM~~ **已解决**：投影层从零训的代码是 fork `bojieli/minimind-v`（26M VLM），与 7-3 的 `bojieli/minimind` 同源。按 KEEP-EXT 补 clone 指引即可。
-2. **7-14 RLVP**：训练代码是否放出？决定 SHIP（放训练+评估）还是仅放评估脚本 + 引用。
-3. **孤儿 stub 目录**：`chapter8/feedback-guided-sampling`、`learn-from-observation` 归并到哪个 ch8 实验，还是删除。
+2. **7-14 RLVP**：RLVP 是 github.com/19PINE-AI/rlvp 论文，直接 README reference 就行了。
+3. **孤儿 stub 目录**：`chapter8/feedback-guided-sampling`、`learn-from-observation` 删除。
+

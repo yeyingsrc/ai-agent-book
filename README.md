@@ -75,6 +75,7 @@ git clone https://github.com/bojieli/SFTvsRL.git                       chapter7/
 git clone https://github.com/bojieli/verl.git                          chapter7/verl
 git clone https://github.com/thinking-machines-lab/tinker-cookbook.git chapter7/tinker-cookbook
 git clone https://github.com/bojieli/lighteval.git                     chapter7/Intuitor/lighteval
+git clone https://github.com/19PINE-AI/rlvp.git                        chapter7/RLVP/rlvp                       # 实验 7-14 RLVP 论文代码
 
 # 第 9 章 · 浏览器自动化与 Claude 示例
 git clone https://github.com/browser-use/browser-use.git               chapter9/browser-use

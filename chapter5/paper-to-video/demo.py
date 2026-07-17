@@ -296,7 +296,12 @@ def main() -> None:
     for d in (SLIDES_DIR, AUDIO_DIR, SEG_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
-    client = OpenAI(base_url=os.getenv("OPENAI_BASE_URL") or None)
+    # timeout / max_retries：TTS/文本调用偶发网络抖动时自动重试，不至于整轮崩溃
+    client = OpenAI(
+        base_url=os.getenv("OPENAI_BASE_URL") or None,
+        timeout=120.0,
+        max_retries=3,
+    )
     total = len(SLIDES)
     segments = []
     manifest = []

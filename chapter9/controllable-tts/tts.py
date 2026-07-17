@@ -35,7 +35,8 @@ _active_model = None  # 首次调用后确定实际使用的模型
 def _get_client():
     global _client
     if _client is None:
-        _client = OpenAI()
+        # timeout + 自动重试：单次网络/SSL 抖动不至于让整段合成崩溃
+        _client = OpenAI(timeout=60.0, max_retries=3)
     return _client
 
 

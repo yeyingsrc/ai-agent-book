@@ -11,6 +11,7 @@
 """
 import json
 import os
+import sys
 
 from advisor_agent import LegalAdvisorAgent
 from extractor import extract_dataset, extraction_accuracy
@@ -77,4 +78,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RuntimeError as exc:
+        # 常见于未配置 OPENAI_API_KEY：给出清晰提示而非原始堆栈。
+        print(f"启动失败：{exc}", file=sys.stderr)
+        sys.exit(1)

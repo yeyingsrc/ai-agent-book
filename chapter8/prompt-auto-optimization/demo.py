@@ -8,15 +8,19 @@
   4. 对照【人工调优版 prompt】；
   5. 打印"保留任务集 / 边界案例集"在优化前后 + 人工版的正确率对比表。
 
-    python demo.py
+    python demo.py            # 完整运行：10 个用例 × 3 份 prompt
+    python demo.py --quick    # 快速演示：每组只取 2 个用例，省时省钱
 """
 
+import argparse
 import os
 import shutil
+import sys
 
 from evaluate import evaluate_prompt
 from coding_agent import optimize_prompt
 from config import get_provider, get_model
+from airline_env import CASES
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INITIAL_PROMPT = os.path.join(HERE, "prompts", "system_prompt.txt")
@@ -56,10 +60,26 @@ def print_table(rows):
     print("=" * 74)
 
 
-def main():
+def _select_cases(limit_per_group):
+    """每组最多取 limit_per_group 个用例（None 表示不限制）。"""
+    if not limit_per_group:
+        return CASES
+    picked, counts = [], {}
+    for c in CASES:
+        g = c["group"]
+        if counts.get(g, 0) < limit_per_group:
+            picked.append(c)
+            counts[g] = counts.get(g, 0) + 1
+    return picked
+
+
+def main(cases=None):
+    if cases is None:
+        cases = CASES
     print("#" * 74)
     print("# 实验 8-3：基于人类反馈的系统提示词自动优化（航空客服场景）")
     print(f"# LLM 提供商: {get_provider()}   模型: {get_model()}")
+    print(f"# 用例数: {len(cases)}（保留集 + 边界集）")
     print("#" * 74)
 
     # ---- 准备：把初始 prompt 复制成本次运行的工作副本（Coding Agent 会改写它）----
@@ -68,7 +88,7 @@ def main():
 
     # ---- 步骤 1：评测初始 prompt ----
     print("\n【步骤 1】用初始系统提示词评测（观察是否过度转接）")
-    before = evaluate_prompt(_read(INITIAL_PROMPT), label="初始 prompt")
+    before = evaluate_prompt(_read(INITIAL_PROMPT), label="初始 prompt", cases=cases)
     print(
         f"\n  初始结果：保留集 {_pct(before['holdout'])}，"
         f"边界集 {_pct(before['boundary'])}"
@@ -92,11 +112,11 @@ def main():
 
     # ---- 步骤 3：评测自动优化后的 prompt ----
     print("\n【步骤 3】用自动优化后的系统提示词重新评测")
-    after = evaluate_prompt(opt["after"], label="自动优化后 prompt")
+    after = evaluate_prompt(opt["after"], label="自动优化后 prompt", cases=cases)
 
     # ---- 步骤 4：对照人工调优版 ----
     print("\n【步骤 4】对照组：人工调优版系统提示词")
-    manual = evaluate_prompt(_read(MANUAL_PROMPT), label="人工调优版 prompt(对照)")
+    manual = evaluate_prompt(_read(MANUAL_PROMPT), label="人工调优版 prompt(对照)", cases=cases)
 
     # ---- 步骤 5：对比表 ----
     print_table([
@@ -119,4 +139,23 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="实验 8-3：基于人类反馈的系统提示词自动优化演示"
+    )
+    parser.add_argument(
+        "--quick", action="store_true",
+        help="快速演示模式：每组只取 2 个用例，减少 API 调用与耗时。",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, metavar="N",
+        help="每组最多评测 N 个用例（覆盖 --quick）。",
+    )
+    args = parser.parse_args()
+    limit = args.limit if args.limit is not None else (2 if args.quick else None)
+
+    try:
+        main(cases=_select_cases(limit))
+    except RuntimeError as e:
+        # 例如 API Key 未设置：给出清晰的人类可读错误，而非原始 traceback
+        print(f"\n[错误] {e}", file=sys.stderr)
+        sys.exit(1)
