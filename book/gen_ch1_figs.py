@@ -7,7 +7,7 @@ OUT = os.path.join(os.path.dirname(__file__), 'images')
 
 
 def fig1_4():
-    """Kimi K2 / GPT-5 native agent architecture — caption 图 1-4"""
+    """Kimi K3 / GPT-5.6 native agent architecture — caption 图 1-4"""
     s = SVG(820, 520)
 
     # Title
@@ -15,7 +15,7 @@ def fig1_4():
 
     # Central model box
     s.rect(260, 70, 300, 100, fill='medium')
-    s.text(410, 100, 'LLM（Kimi K2 / GPT-5）', size=FS_BODY, bold=True)
+    s.text(410, 100, 'LLM（Kimi K3 / GPT-5.6）', size=FS_BODY, bold=True)
     s.text(410, 130, 'RL 训练后的原生 Agent 能力', size=FS_SMALL, fill='text_light')
 
     # Built-in tools on the right
