@@ -56,7 +56,21 @@ class MultimodalContent:
     mime_type: Optional[str] = None
     extracted_text: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
+    def __post_init__(self):
+        # 自动补全 MIME 类型：优先按文件名推断，再按声明的模态兜底。
+        # 否则原生 OpenAI / Doubao 图像请求会拼出 "data:None;base64,..." 导致 400 错误。
+        if not self.mime_type and self.path:
+            guessed = mimetypes.guess_type(self.path)[0]
+            if guessed:
+                self.mime_type = guessed
+        if not self.mime_type:
+            self.mime_type = {
+                "pdf": "application/pdf",
+                "image": "image/jpeg",
+                "audio": "audio/mpeg",
+            }.get(self.type)
+
     def get_bytes(self) -> bytes:
         """Get content as bytes"""
         if self.data:

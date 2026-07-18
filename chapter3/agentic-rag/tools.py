@@ -36,7 +36,8 @@ class KnowledgeBaseTools:
     def __init__(self, config: KnowledgeBaseConfig):
         self.config = config
         self.document_store = {}  # In-memory store for documents
-        
+        self._offline_retriever = None  # Lazily built in-process BM25 index
+
         # Load document store if exists
         try:
             with open(config.document_store_path, 'r', encoding='utf-8') as f:
@@ -65,7 +66,9 @@ class KnowledgeBaseTools:
             List of matching document chunks with scores
         """
         try:
-            if self.config.type == KnowledgeBaseType.LOCAL:
+            if self.config.type == KnowledgeBaseType.OFFLINE:
+                return self._search_offline(query)
+            elif self.config.type == KnowledgeBaseType.LOCAL:
                 return self._search_local(query)
             elif self.config.type == KnowledgeBaseType.DIFY:
                 return self._search_dify(query)
@@ -79,6 +82,20 @@ class KnowledgeBaseTools:
             logger.error(f"Error in knowledge base search: {e}")
             return []
     
+    def _get_offline_retriever(self):
+        """Lazily build the in-process BM25 retriever over the local corpus."""
+        if self._offline_retriever is None:
+            from offline_retriever import OfflineRetriever
+            self._offline_retriever = OfflineRetriever(self.config.offline_corpus_path)
+        return self._offline_retriever
+
+    def _search_offline(self, query: str) -> List[Dict[str, Any]]:
+        """Search the in-process BM25 index (no server, no API key required)."""
+        retriever = self._get_offline_retriever()
+        results = retriever.search(query, self.config.offline_top_k)
+        logger.info(f"Offline BM25 search returned {len(results)} results")
+        return results
+
     def _search_local(self, query: str) -> List[Dict[str, Any]]:
         """Search using local retrieval pipeline"""
         try:
@@ -296,7 +313,9 @@ class KnowledgeBaseTools:
             if doc_id in self.document_store:
                 return self.document_store[doc_id]
             
-            if self.config.type == KnowledgeBaseType.LOCAL:
+            if self.config.type == KnowledgeBaseType.OFFLINE:
+                return self._get_offline_retriever().get_document(doc_id)
+            elif self.config.type == KnowledgeBaseType.LOCAL:
                 return self._get_document_local(doc_id)
             elif self.config.type == KnowledgeBaseType.DIFY:
                 return self._get_document_dify(doc_id)

@@ -71,6 +71,78 @@ async def basic_example():
         console.print(f"- {memory.get('memory', memory.get('text', 'N/A'))}")
 
 
+async def memory_pipeline_example(agent=None, user_id: str = "pipeline_user"):
+    """Demonstrate Mem0's extract-compare-decide pipeline (ADD/UPDATE/DELETE/NOOP).
+
+    This reproduces the book's centerpiece example: the user first says they
+    live in Beijing, later says they moved to Shanghai, and Mem0 resolves the
+    conflict by UPDATE-ing the existing memory instead of keeping two
+    contradictory records. It also shows a stored memory being recalled in a
+    *later* session, which is the whole point of a memory framework.
+
+    Requires a working LLM API (KIMI_API_KEY) and vector store — Mem0's fact
+    extraction and semantic retrieval are online model calls.
+    """
+    console.print("\n[bold cyan]Memory Pipeline Example (提取—对比—决策)[/bold cyan]\n")
+
+    if agent is None:
+        agent = Mem0Agent(Config.from_env())
+
+    def show_events(label, events):
+        console.print(f"[bold]{label}[/bold]")
+        if events:
+            for ev in events:
+                console.print(f"  [magenta][{ev['event']}][/magenta] {ev['memory']} "
+                              f"[dim](id={ev['id']})[/dim]")
+        else:
+            console.print("  [dim](NOOP — 没有产生新的记忆变更)[/dim]")
+        console.print()
+
+    # --- Session 1: establish facts about the user ---------------------------
+    console.print("[yellow]Session 1 —— 首次对话，建立用户画像[/yellow]")
+    events = await asyncio.to_thread(
+        agent.add_memory,
+        "我住在北京，在一家 AI 创业公司做后端工程师。",
+        user_id,
+    )
+    show_events("写入「我住在北京 / 后端工程师」的记忆决策：", events)
+
+    events = await asyncio.to_thread(
+        agent.add_memory,
+        "我平时喜欢周末去爬山，也在学弹吉他。",
+        user_id,
+    )
+    show_events("写入「爱好」的记忆决策：", events)
+
+    # --- Recall the stored memory (used later, across the session) -----------
+    console.print("[yellow]检索 —— 从记忆中回忆用户信息（跨轮次复用）[/yellow]")
+    hits = await asyncio.to_thread(
+        agent.search_memory, "这个用户住在哪座城市？做什么工作？", user_id
+    )
+    console.print(f"[bold]检索到 {len(hits)} 条相关记忆：[/bold]")
+    for mem in hits:
+        console.print(f"  - {mem.get('memory', mem.get('text', 'N/A'))}")
+    console.print()
+
+    # --- Session 2 (later): conflicting fact triggers UPDATE -----------------
+    console.print("[yellow]Session 2（一段时间后）—— 用户搬家，出现冲突信息[/yellow]")
+    events = await asyncio.to_thread(
+        agent.add_memory,
+        "更新一下，我上个月从北京搬到上海了。",
+        user_id,
+    )
+    show_events("写入「搬到上海」后的记忆决策（预期出现 UPDATE，而非新增矛盾条目）：", events)
+
+    # --- Verify consolidation: no contradictory Beijing/Shanghai pair --------
+    console.print("[yellow]核对 —— 记忆库应当保持一致，而不是同时保留北京与上海[/yellow]")
+    memories = await asyncio.to_thread(agent.get_all_memories, user_id)
+    console.print(f"[bold]用户 {user_id} 当前全部记忆（{len(memories)} 条）：[/bold]")
+    for i, mem in enumerate(memories, 1):
+        console.print(f"  {i}. {mem.get('memory', mem.get('text', 'N/A'))}")
+    console.print()
+    console.print("[dim]提示：观察居住地记忆是否已被 UPDATE 为“上海”，且没有残留矛盾的“北京”条目。[/dim]")
+
+
 async def multi_session_example():
     """Example showing memory persistence across sessions."""
     console.print("\n[bold cyan]Multi-Session Memory Example[/bold cyan]\n")
@@ -207,9 +279,12 @@ async def main():
     
     try:
         # Run examples
+        await memory_pipeline_example()
+        await asyncio.sleep(1)
+
         await basic_example()
         await asyncio.sleep(1)
-        
+
         await multi_session_example()
         await asyncio.sleep(1)
         

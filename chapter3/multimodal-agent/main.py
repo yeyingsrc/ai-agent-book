@@ -13,6 +13,22 @@ from agent import MultimodalAgent, MultimodalContent
 from config import ExtractionMode, Config
 
 
+class _Tee:
+    """将 stdout 同时写入终端与文件，用于 --output。"""
+
+    def __init__(self, stream, file_handle):
+        self._stream = stream
+        self._file = file_handle
+
+    def write(self, data):
+        self._stream.write(data)
+        self._file.write(data)
+
+    def flush(self):
+        self._stream.flush()
+        self._file.flush()
+
+
 async def process_file(
     agent: MultimodalAgent,
     file_path: str,
@@ -224,18 +240,31 @@ async def interactive_chat(agent: MultimodalAgent) -> None:
 
 async def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(description="Multimodal Agent with Multiple Extraction Techniques")
+    parser = argparse.ArgumentParser(
+        description="多模态 Agent：对比原生多模态、提取为文本、带工具三种信息提取范式。",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "示例：\n"
+            "  # 处理图像并提问\n"
+            "  python main.py --file test_files/sample_chart.png --query \"图中哪个季度营收最高？\"\n"
+            "  # 处理 PDF 文档（提取为文本模式）\n"
+            "  python main.py --mode extract_to_text --file report.pdf --query \"总结要点\"\n"
+            "  # 进入交互式对话\n"
+            "  python main.py --interactive"
+        ),
+    )
     parser.add_argument("--mode", choices=["native", "extract_to_text"], default="native",
-                       help="Extraction mode (default: native)")
+                       help="提取模式：native（原生多模态）或 extract_to_text（提取为文本），默认 native")
     parser.add_argument("--model", default="gemini-2.5-pro",
-                       help="Model to use (default: gemini-2.5-pro)")
+                       help="使用的模型（默认：gemini-2.5-pro）")
     parser.add_argument("--tools", action="store_true",
-                       help="Enable multimodal analysis tools")
-    parser.add_argument("--file", help="Process a single file")
-    parser.add_argument("--query", help="Query to ask about the file")
+                       help="启用多模态分析工具（analyze_image / analyze_audio / analyze_pdf）")
+    parser.add_argument("--file", help="要处理的单个文件（图像 / PDF 文档 / 音频）")
+    parser.add_argument("--query", help="向该文件提出的问题")
+    parser.add_argument("--output", "-o", help="将处理结果同时写入指定文件")
     parser.add_argument("--interactive", action="store_true",
-                       help="Start interactive chat session")
-    
+                       help="进入交互式对话会话")
+
     args = parser.parse_args()
     
     # Validate API keys
@@ -257,7 +286,18 @@ async def main():
     
     # Process based on arguments
     if args.file:
-        await process_file(agent, args.file, args.query)
+        if args.output:
+            # 将结果同时写入文件
+            with open(args.output, "w", encoding="utf-8") as fh:
+                original_stdout = sys.stdout
+                sys.stdout = _Tee(original_stdout, fh)
+                try:
+                    await process_file(agent, args.file, args.query)
+                finally:
+                    sys.stdout = original_stdout
+            print(f"\n处理结果已写入：{args.output}")
+        else:
+            await process_file(agent, args.file, args.query)
     elif args.interactive:
         await interactive_chat(agent)
     else:

@@ -73,6 +73,54 @@ This will demonstrate:
 - Multi-session memory persistence
 - Multi-agent collaboration
 
+### Memory Pipeline Demo (提取—对比—决策)
+
+The single clearest demonstration of Mem0's value — its ADD / UPDATE / DELETE /
+NOOP pipeline and cross-session recall — is the `demo` mode:
+
+```bash
+python main.py --mode demo --user-id demo_user
+```
+
+This reproduces the book's centerpiece example (chapter3.md): the user first
+says they live in Beijing, a later turn says they moved to Shanghai, and Mem0
+resolves the conflict with an **UPDATE** (revising the existing memory) instead
+of storing two contradictory records. In between, a stored memory is recalled
+via semantic search, showing memory being *used later*. (The same routine is
+`memory_pipeline_example()` in `quickstart.py`, run first by `python quickstart.py`.)
+
+### Direct Memory Operations CLI
+
+Mem0's memory API is exposed directly so you can observe each pipeline decision
+without the chat loop. All flags have Chinese `--help` (`python main.py --help`):
+
+```bash
+# ADD — write a conversation/utterance; prints the ADD/UPDATE/DELETE events
+python main.py --mode memory --op add   --text "我住在北京，是一名后端工程师" --user-id u1
+
+# SEARCH — semantic recall
+python main.py --mode memory --op search --query "这个用户住在哪里？" --user-id u1
+
+# GET-ALL — list every stored memory (optionally dump to JSON)
+python main.py --mode memory --op get-all --user-id u1 --output mem.json
+
+# HISTORY — the change/audit trail of one memory id (shows UPDATE/DELETE over time)
+python main.py --mode memory --op history --memory-id <id>
+
+# DELETE — remove one memory by id
+python main.py --mode memory --op delete --memory-id <id>
+```
+
+Key flags: `--op {add,search,get-all,history,delete}`, `--text`, `--query`,
+`--memory-id`, `--user-id`, `--agent-id`, `--model` (override `MODEL_NAME`),
+`--output` (write result JSON). `--text` accepts either a raw string or a path
+to a JSON message list.
+
+> These operations, `demo` mode, and the chat modes all require a working LLM
+> API key (`KIMI_API_KEY`) and a vector store — Mem0's fact extraction and
+> semantic retrieval are online model calls. With no key the CLI parses
+> arguments and then reports the missing key; no memory output is fabricated.
+
 ### Interactive Mode
 
 Start an interactive conversation session:

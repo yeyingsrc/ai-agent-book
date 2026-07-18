@@ -5,9 +5,12 @@ Interfaces with the existing retrieval pipeline on port 4242.
 """
 
 import os
+import re
+import math
 import json
 import logging
 import requests
+from collections import Counter
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +21,77 @@ from chunker import ConversationChunk
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _tokenize(text: str) -> List[str]:
+    """Lightweight tokenizer shared by the local backend (alphanumeric + CJK)."""
+    return re.findall(r"[a-zA-Z0-9]+|[一-鿿]", text.lower())
+
+
+class LocalBM25Backend:
+    """A dependency-free, in-process BM25 index.
+
+    This is the offline fallback for the external retrieval pipeline: it lets the
+    whole store/retrieve path run without any network service or API key, which is
+    what makes the experiment reproducible on a laptop. Sparse (BM25) retrieval is
+    the same lexical scoring the pipeline exposes as its "sparse"/"hybrid" modes.
+    """
+
+    def __init__(self, k1: float = 1.5, b: float = 0.75):
+        self.k1 = k1
+        self.b = b
+        self.doc_ids: List[str] = []
+        self.doc_tokens: List[List[str]] = []
+        self.idf: Dict[str, float] = {}
+        self.avgdl: float = 0.0
+        self._built: bool = False
+
+    def clear(self):
+        self.doc_ids = []
+        self.doc_tokens = []
+        self.idf = {}
+        self.avgdl = 0.0
+        self._built = False
+
+    def add(self, doc_id: str, text: str):
+        self.doc_ids.append(doc_id)
+        self.doc_tokens.append(_tokenize(text))
+        self._built = False
+
+    def _build(self):
+        n_docs = len(self.doc_tokens)
+        df: Counter = Counter()
+        for tokens in self.doc_tokens:
+            for term in set(tokens):
+                df[term] += 1
+        # Standard BM25 idf with +1 smoothing so it stays non-negative.
+        self.idf = {
+            term: math.log(1 + (n_docs - freq + 0.5) / (freq + 0.5))
+            for term, freq in df.items()
+        }
+        self.avgdl = (sum(len(t) for t in self.doc_tokens) / n_docs) if n_docs else 0.0
+        self._built = True
+
+    def search(self, query: str, top_k: int = 5) -> List[Tuple[str, float]]:
+        if not self._built:
+            self._build()
+        query_terms = _tokenize(query)
+        scored: List[Tuple[str, float]] = []
+        for idx, tokens in enumerate(self.doc_tokens):
+            tf = Counter(tokens)
+            dl = len(tokens)
+            score = 0.0
+            for term in query_terms:
+                freq = tf.get(term, 0)
+                if not freq:
+                    continue
+                idf = self.idf.get(term, 0.0)
+                denom = freq + self.k1 * (1 - self.b + self.b * dl / (self.avgdl or 1))
+                score += idf * (freq * (self.k1 + 1)) / denom
+            if score > 0:
+                scored.append((self.doc_ids[idx], score))
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return scored[:top_k]
 
 
 @dataclass
@@ -54,31 +128,49 @@ class MemoryIndexer:
         self.chunks: Dict[str, ConversationChunk] = {}
         self.chunk_texts: Dict[str, str] = {}  # Map chunk_id to prepared text
         self.doc_id_mapping: Dict[str, str] = {}  # Map generated doc_id to our chunk_id
-        
+
         # Retrieval pipeline URL
-        self.retrieval_url = "http://localhost:4242"
-        
+        self.retrieval_url = getattr(self.config, "retrieval_url", "http://localhost:4242")
+
+        # Local, in-process fallback backend (no external service required)
+        self.local_backend = LocalBM25Backend()
+
         # Create directories
         Path(self.config.index_path).parent.mkdir(parents=True, exist_ok=True)
         Path(self.config.chunk_store_path).parent.mkdir(parents=True, exist_ok=True)
-        
-        # Check retrieval pipeline availability
-        self._check_retrieval_pipeline()
-        
+
+        # Decide which backend to use: "local", "pipeline", or "auto"
+        backend = getattr(self.config, "retrieval_backend", "auto")
+        if backend == "local":
+            self.use_local = True
+        elif backend == "pipeline":
+            self.use_local = False
+            self._check_retrieval_pipeline()
+        else:  # auto
+            self.use_local = not self._check_retrieval_pipeline()
+
+        if self.use_local:
+            logger.info("Using built-in local BM25 backend (offline mode, no port 4242 needed)")
+        else:
+            logger.info("Using external retrieval pipeline backend")
+
         logger.info(f"Initialized indexer with mode: {self.config.mode}")
-    
-    def _check_retrieval_pipeline(self):
-        """Check if the retrieval pipeline service is available"""
+
+    def _check_retrieval_pipeline(self) -> bool:
+        """Check if the retrieval pipeline service is available. Returns True if reachable."""
         try:
             response = requests.get(f"{self.retrieval_url}/health", timeout=2)
             if response.status_code == 200:
                 logger.info("✓ Retrieval pipeline service is available")
-            else:
-                logger.warning(f"Retrieval pipeline returned status {response.status_code}")
+                return True
+            logger.warning(f"Retrieval pipeline returned status {response.status_code}")
+            return False
         except requests.exceptions.RequestException as e:
             logger.warning(f"Retrieval pipeline service not available at {self.retrieval_url}: {e}")
-            logger.info("Note: The retrieval pipeline needs to be running. Start it with:")
-            logger.info("  cd projects/week3/retrieval-pipeline && python api_server.py")
+            logger.info("Note: falling back to the built-in local BM25 backend (offline).")
+            logger.info("To use the external pipeline instead, start it with:")
+            logger.info("  cd ../retrieval-pipeline && python api_server.py")
+            return False
     
     def add_chunks(self, chunks: List[ConversationChunk], rebuild: bool = True):
         """
@@ -199,7 +291,16 @@ class MemoryIndexer:
         return f"Tags: {', '.join(tags)}" if tags else ""
     
     def _index_documents(self, documents: List[Dict[str, Any]]):
-        """Send documents to the retrieval pipeline for indexing"""
+        """Index documents into the active backend (local BM25 or the external pipeline)."""
+        if self.use_local:
+            self.local_backend.clear()
+            for doc in documents:
+                chunk_id = doc.get("metadata", {}).get("doc_id")
+                if chunk_id:
+                    self.local_backend.add(chunk_id, doc["text"])
+                    self.doc_id_mapping[chunk_id] = chunk_id
+            logger.info(f"Indexed {len(documents)} documents into local BM25 backend")
+            return
         try:
             # First, clear existing index
             clear_response = requests.post(f"{self.retrieval_url}/clear")
@@ -294,10 +395,25 @@ class MemoryIndexer:
         }
         
         search_mode = mode_map.get(mode, "hybrid")
-        
+
         if not top_k or top_k < 1:
             top_k = 3
-        
+
+        # Offline path: score against the in-process BM25 index.
+        if self.use_local:
+            results = []
+            for chunk_id, score in self.local_backend.search(query, top_k=top_k):
+                chunk = self.chunks.get(chunk_id)
+                if chunk:
+                    results.append(SearchResult(
+                        chunk_id=chunk_id,
+                        score=float(score),
+                        chunk=chunk,
+                        match_type="local_bm25"
+                    ))
+            logger.info(f"Search returned {len(results)} results from local BM25 backend")
+            return results
+
         try:
             # Query the retrieval pipeline
             # Note: The pipeline has two top_k parameters:

@@ -8,9 +8,7 @@ import yaml
 import os
 from typing import Dict, List, Any
 
-# Layer 2 test case templates (disambig
-
-uation scenarios)
+# Layer 2 test case templates (disambiguation scenarios)
 LAYER2_TEMPLATES = [
     {
         "id": "07", 

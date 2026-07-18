@@ -438,14 +438,23 @@ Please give a short succinct context to situate this chunk within the overall do
     def compare_retrieval_methods(self,
                                  query: str,
                                  contextual_chunks: List[ContextualChunk],
-                                 non_contextual_chunks: List[ContextualChunk]) -> Dict[str, Any]:
+                                 non_contextual_chunks: List[ContextualChunk],
+                                 top_k: int = 5) -> Dict[str, Any]:
         """
-        Compare contextual vs non-contextual retrieval.
-        
+        Compare contextual vs non-contextual retrieval on the SAME query.
+
         Educational Note:
-        This method demonstrates the improvement that contextual
-        chunks provide for retrieval accuracy.
+        This is the ``compare_retrieval_methods`` capability referenced in
+        实验 3-11. It builds two BM25 indexes fully offline (no API / server):
+          * contextual index over ``contextualized_text`` (前缀 + 原文)
+          * plain index over the original chunk ``text``
+        and returns the top-k ranked chunks under each, so the caller can see
+        exactly how the contextual prefix re-ranks the same corpus.
         """
+        from rank_bm25 import BM25Okapi
+        import numpy as np
+        from compare_retrieval import tokenize
+
         results = {
             "query": query,
             "timestamp": datetime.now().isoformat(),
@@ -453,11 +462,42 @@ Please give a short succinct context to situate this chunk within the overall do
             "non_contextual_results": [],
             "analysis": {}
         }
-        
-        # This would integrate with the retrieval pipeline
-        # For now, we return the structure
-        logger.info(f"Comparison structure prepared for query: {query}")
-        
+
+        def _rank(chunks: List[ContextualChunk], field: str):
+            if not chunks:
+                return []
+            corpus = [tokenize(getattr(c, field)) for c in chunks]
+            index = BM25Okapi(corpus)
+            scores = index.get_scores(tokenize(query))
+            order = np.argsort(scores)[::-1][:top_k]
+            ranked = []
+            for rank, idx in enumerate(order, 1):
+                c = chunks[idx]
+                ranked.append({
+                    "chunk_id": c.chunk_id,
+                    "score": float(scores[idx]),
+                    "rank": rank,
+                    "text": c.text[:200],
+                    "context": c.context[:200],
+                })
+            return ranked
+
+        results["contextual_results"] = _rank(contextual_chunks, "contextualized_text")
+        results["non_contextual_results"] = _rank(non_contextual_chunks, "text")
+
+        ctx_top = results["contextual_results"][0] if results["contextual_results"] else None
+        plain_top = results["non_contextual_results"][0] if results["non_contextual_results"] else None
+        results["analysis"] = {
+            "contextual_top_chunk": ctx_top["chunk_id"] if ctx_top else None,
+            "non_contextual_top_chunk": plain_top["chunk_id"] if plain_top else None,
+            "contextual_top_score": ctx_top["score"] if ctx_top else 0.0,
+            "non_contextual_top_score": plain_top["score"] if plain_top else 0.0,
+            "top1_changed": bool(ctx_top and plain_top and ctx_top["chunk_id"] != plain_top["chunk_id"]),
+        }
+
+        logger.info(f"Compared retrieval methods for query: {query} | "
+                    f"top1 changed={results['analysis']['top1_changed']}")
+
         return results
     
     def get_statistics(self) -> Dict[str, Any]:

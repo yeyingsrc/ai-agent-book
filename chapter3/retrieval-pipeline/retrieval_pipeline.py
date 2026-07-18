@@ -10,6 +10,7 @@ from config import PipelineConfig, SearchMode
 from document_store import DocumentStore
 from retrieval_client import RetrievalClient, SearchResult
 from reranker import Reranker, RerankResult
+from fusion import fuse
 
 logger = logging.getLogger(__name__)
 
@@ -237,25 +238,39 @@ class RetrievalPipeline:
                 combined[doc_id]["sparse_score"] = result.score
                 combined[doc_id]["sparse_rank"] = idx + 1
         
-        # Convert to list and sort by average rank (lower is better)
+        # Convert to list and keep the legacy average-rank field for reference.
         combined_list = list(combined.values())
-        
-        # Calculate combined score for initial ordering
         for doc in combined_list:
             ranks = []
             if doc["dense_rank"] is not None:
                 ranks.append(doc["dense_rank"])
             if doc["sparse_rank"] is not None:
                 ranks.append(doc["sparse_rank"])
-            
-            if ranks:
-                doc["avg_rank"] = sum(ranks) / len(ranks)
-            else:
-                doc["avg_rank"] = float('inf')
-        
-        # Sort by average rank
-        combined_list.sort(key=lambda x: x["avg_rank"])
-        
+            doc["avg_rank"] = sum(ranks) / len(ranks) if ranks else float('inf')
+
+        # Fuse the two ranked lists into one unified candidate pool. This is the
+        # dedicated fusion stage described in the book (RRF / weighted). The order
+        # produced here is the candidate pool that neural reranking then refines.
+        method = getattr(self.config, "fusion_method", "rrf")
+        if method == "avg_rank":
+            combined_list.sort(key=lambda x: x["avg_rank"])
+            return combined_list
+
+        dense_ranked = [(r.doc_id, r.score) for r in dense_results]
+        sparse_ranked = [(r.doc_id, r.score) for r in sparse_results]
+        fused = fuse(
+            {"dense": dense_ranked, "sparse": sparse_ranked},
+            method=method,
+            k=getattr(self.config, "rrf_k", 60),
+        )
+        fused_order = {doc_id: rank for rank, (doc_id, _) in enumerate(fused)}
+        for doc in combined_list:
+            doc["fusion_score"] = dict(fused).get(doc["doc_id"])
+        # Sort by fused rank; any doc not in the fused output (shouldn't happen)
+        # falls back to the end, then to its average rank for stability.
+        combined_list.sort(
+            key=lambda x: (fused_order.get(x["doc_id"], len(fused)), x["avg_rank"])
+        )
         return combined_list
     
     def _format_reranked_results(self, reranked: List[RerankResult]) -> List[Dict[str, Any]]:

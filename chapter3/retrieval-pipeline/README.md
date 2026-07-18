@@ -66,9 +66,21 @@ This project demonstrates:
   - Language-specific
   - Requires exact terms
 
+### Result Fusion (RRF / Weighted)
+- **Module**: `fusion.py`
+- **Purpose**: Merge the separately-ranked dense and sparse candidate lists into
+  one unified pool before reranking (the *fusion* stage)
+- **Two strategies** (both discussed in the book):
+  - **Reciprocal Rank Fusion (RRF)**: `score(d) = Σ 1/(k + rank_r(d))`, `k=60`.
+    Uses only ranks, so it never has to compare a cosine similarity against a
+    BM25 score — robust and scale-free.
+  - **Weighted score fusion**: min-max normalize each list to `[0,1]`, then take a
+    weighted sum. Keeps the raw relevance signal, at the cost of tuning the scale
+    alignment.
+
 ### Neural Reranking
-- **Model**: BGE-Reranker-v2-M3
-- **Purpose**: Re-score and reorder combined results
+- **Model**: BGE-Reranker-v2-M3 (production); `BAAI/bge-reranker-base` (lighter, used by `evaluate.py`)
+- **Purpose**: Re-score and reorder the fused candidate pool
 - **Benefits**:
   - Better relevance ranking
   - Combines signals from both methods
@@ -143,6 +155,104 @@ This demonstrates real queries with explanations.
 3. **Access API documentation**:
 ```
 http://localhost:4242/docs
+```
+
+## 🧪 Offline Evaluation CLI (`evaluate.py`)
+
+`test_client.py` / `demo.py` above require the three microservices (ports
+4240/4241/4242) to be running. **`evaluate.py` runs the entire pipeline in a
+single process, fully offline**, so you can reproduce the "each stage improves
+the ranking" story with local models and no services.
+
+It walks the complete pipeline — **chunk → embed → retrieve → fuse → rerank** —
+on a small labelled eval set and prints a stage-by-stage comparison table plus a
+per-query breakdown. The CLI has a full Chinese `--help`:
+
+```bash
+python evaluate.py --help          # 中文帮助：语料/查询/阶段/top-k/模型/输出等
+python evaluate.py                 # 内置评测集，完整对比表（默认）
+python evaluate.py --no-dense      # 仅 BM25，纯离线、无需任何模型
+python evaluate.py --no-rerank     # 跳过重排阶段
+python evaluate.py --query "XR-7003"   # 单条查询逐阶段排名追踪
+python evaluate.py --embed-model BAAI/bge-m3 --pooling cls   # 换稠密模型
+python evaluate.py --output result.json                      # 结果写入 JSON
+```
+
+Local components (each stage is a real model / algorithm, not a mock):
+
+| Stage    | Component (default)                              | Offline? |
+|----------|--------------------------------------------------|----------|
+| chunk    | character-window splitter                         | ✅ pure Python |
+| sparse   | BM25 (`rank_bm25`)                                | ✅ no model download |
+| dense    | `sentence-transformers/all-MiniLM-L6-v2` (~90MB) | ✅ via `transformers` (multilingual: swap in `Qwen/Qwen3-Embedding-0.6B` / `BAAI/bge-m3`) |
+| fuse     | RRF + weighted (`fusion.py`)                      | ✅ pure Python |
+| rerank   | `BAAI/bge-reranker-base` (~1.1GB, first run downloads) | ✅ once cached |
+
+> **Note**: `--no-dense` needs no ML model at all (BM25 only). The dense and
+> rerank stages need local models; on first run they download from HuggingFace,
+> after which `--offline` keeps everything on the local cache. On Apple Silicon,
+> some `transformers` builds emit `NaN` on the MPS device — the CLI detects this
+> and automatically falls back to CPU, so results are always finite.
+
+### Real output (reproduced on this machine)
+
+The built-in eval set has two deliberately hard clusters: **near-duplicate codes**
+(`XR-7001..XR-7006`, `HTTP-400..HTTP-500`) that break dense retrieval (the vectors
+are almost identical, only exact term matching finds the right one), and
+**zero-lexical-overlap paraphrases** (query "reclaiming unused heap space without
+programmer effort" → doc "Automatic memory management frees developers…") that
+break BM25.
+
+```
+Stage / Method            Recall@3         MRR      nDCG@3
+------------------------------------------------------------------------------
+BM25 (sparse)               0.9000      0.8500      0.8631
+Dense                       1.0000      0.9000      0.9262
+Hybrid-RRF                  1.0000      1.0000      1.0000
+Hybrid-Weighted             1.0000      0.9500      0.9631
+Hybrid-RRF+Rerank           1.0000      0.9500      0.9631
+
+逐条查询 MRR 明细（1.00=正确文档排在第 1 位）
+Query                                        BM25  Dense    RRF    Wgt Rerank
+------------------------------------------------------------------------------
+XR-7003                                      1.00   0.50   1.00   1.00   1.00
+XR-7005                                      1.00   0.50   1.00   1.00   1.00
+HTTP-403                                     1.00   1.00   1.00   1.00   1.00
+HTTP-400                                     1.00   1.00   1.00   1.00   0.50
+a beginner friendly language with tidy...    1.00   1.00   1.00   1.00   1.00
+reclaiming unused heap space without p...    0.00   1.00   1.00   1.00   1.00
+how vegetation turns light into food         0.50   1.00   1.00   0.50   1.00
+hiding a note so eavesdroppers cannot ...    1.00   1.00   1.00   1.00   1.00
+how does water move between the ocean ...    1.00   1.00   1.00   1.00   1.00
+how are volcanoes formed from molten rock    1.00   1.00   1.00   1.00   1.00
+```
+
+**How to read it:**
+- **BM25 (sparse)** nails every exact code but collapses on the two paraphrase
+  queries (`reclaiming…`=0.00, `vegetation…`=0.50).
+- **Dense** is the mirror image: perfect on paraphrases, but confuses the
+  near-duplicate codes (`XR-7003`/`XR-7005`=0.50 — it ranks a sibling code first).
+- **Hybrid-RRF** combines the two and reaches a **perfect 1.00** across the board:
+  fusion rescues *both* single-method failures. This is the headline of Exp. 3-6.
+- **Weighted fusion** is strong too but less robust than RRF here (the `vegetation`
+  query drops to 0.50 because a lexical near-match distorts the normalized scores —
+  exactly the "scale alignment is hard to tune" caveat).
+- **Reranking**: on this 17-doc toy corpus RRF is *already* optimal, so reranking
+  has no headroom; a cross-encoder is a semantic matcher and can even slightly
+  reorder a trivial exact-code lookup (`HTTP-400`). Its value grows on larger
+  candidate pools and natural-language queries — see the single-query trace below.
+
+The single-query trace makes the fusion mechanism concrete:
+
+```
+$ python evaluate.py --query "XR-7003"
+[BM25 (sparse)]
+  1. xr_7003        score=  3.2260  Product model XR-7003 is a smartphone available now.
+[Dense]
+  1. xr_7001        score=  0.5247  Product model XR-7001 ...   # dense ranks the wrong sibling first
+  2. xr_7003        score=  0.5195  Product model XR-7003 ...
+[Hybrid-RRF]
+  1. xr_7003        score=  0.0325  Product model XR-7003 ...   # fusion promotes the exact match to #1
 ```
 
 ## 📊 Educational Test Cases
@@ -299,11 +409,13 @@ Edit `config.py` to adjust:
 
 ```
 retrieval-pipeline/
-├── config.py               # Configuration settings
+├── config.py               # Configuration settings (incl. fusion_method / rrf_k)
 ├── document_store.py       # In-memory document storage
 ├── retrieval_client.py     # Client for dense/sparse services
 ├── reranker.py            # BGE-Reranker implementation
-├── retrieval_pipeline.py   # Main pipeline orchestration
+├── fusion.py              # Result fusion: RRF + weighted score fusion
+├── retrieval_pipeline.py   # Main pipeline orchestration (uses fusion.py)
+├── evaluate.py            # Offline single-process eval CLI (Chinese --help)
 ├── main.py                # FastAPI server
 ├── test_client.py         # Educational test cases
 ├── demo.py                # Interactive demonstration

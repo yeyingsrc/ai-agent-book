@@ -46,7 +46,7 @@ MultimodalAgent
 
 1. Clone the repository and navigate to the project directory:
 ```bash
-cd projects/week3/multimodal-agent
+cd chapter3/multimodal-agent
 ```
 
 2. Install dependencies:
@@ -64,6 +64,31 @@ cp env.example .env
 ```bash
 export $(cat .env | xargs)
 ```
+
+## Quick Offline Start (No API Key)
+
+Generate a bundled multimodal sample — a chart-bearing report — so you can run
+Experiment 3-7 end to end. The exact quarterly figures live **only in the chart's
+bars**, not in the surrounding text, which is what makes the three-paradigm
+trade-off measurable.
+
+```bash
+# Offline: creates test_files/sample_chart.png and test_files/sample_report.pdf
+python create_sample.py           # or: python demo.py --generate-sample
+```
+
+Then compare the three extraction paradigms on the same file + question
+(requires a vision API key such as OpenAI or Gemini):
+
+```bash
+python demo.py \
+  --file test_files/sample_chart.png \
+  --query "Which quarter had the highest revenue, and what was the exact value?" \
+  --model gpt-4o
+```
+
+All CLIs expose a Chinese `--help` (`python demo.py --help`,
+`python main.py --help`, `python create_sample.py --help`).
 
 ## Usage
 
@@ -140,15 +165,34 @@ asyncio.run(example())
 Run the comprehensive comparison demo:
 
 ```bash
-# Compare extraction modes for a specific file
+# Compare extraction modes for a specific file (flags form)
+python demo.py --file document.pdf --query "What are the key findings?" --model gpt-4o
+
+# Backward-compatible positional form still works
 python demo.py document.pdf "What are the key findings?"
+
+# Save the full transcript, and skip the cross-model pass
+python demo.py --file test_files/sample_chart.png \
+  --query "Which quarter had the highest revenue?" \
+  --model gpt-4o --skip-model-comparison --output result.txt
 
 # This will run:
 # 1. Native multimodal mode
 # 2. Extract to text mode
 # 3. Extract to text with tools
-# 4. Comparison across different models
+# 4. Comparison across different models (unless --skip-model-comparison)
 ```
+
+Demo CLI flags:
+
+| Flag | Description |
+|------|-------------|
+| `--file` / positional `file` | Multimodal file to process (image / PDF / audio) |
+| `--query` / positional `query` | Question to ask about the file |
+| `--model` | Model for native/extract modes (default: `gemini-2.5-pro`) |
+| `--skip-model-comparison` | Only run the three-paradigm comparison |
+| `--generate-sample` | Offline: create the bundled chart sample, then exit |
+| `--output`, `-o` | Also write the full transcript to a file |
 
 ### Mode Comparison
 

@@ -2,16 +2,33 @@
 Demo script showcasing different extraction techniques
 """
 
+import argparse
 import asyncio
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from agent import MultimodalAgent, MultimodalContent
 from config import ExtractionMode
 
 
-async def compare_extraction_modes(file_path: str, query: str):
+class _Tee:
+    """Duplicate stdout writes to a file so --output can save the transcript."""
+
+    def __init__(self, stream, file_handle):
+        self._stream = stream
+        self._file = file_handle
+
+    def write(self, data):
+        self._stream.write(data)
+        self._file.write(data)
+
+    def flush(self):
+        self._stream.flush()
+        self._file.flush()
+
+
+async def compare_extraction_modes(file_path: str, query: str, model: str = "gemini-2.5-pro"):
     """Compare different extraction modes for the same content"""
     
     print(f"\n{'='*80}")
@@ -36,11 +53,11 @@ async def compare_extraction_modes(file_path: str, query: str):
     
     # Test with native mode (Gemini)
     print("\n" + "-"*60)
-    print("1. NATIVE MULTIMODAL MODE (Gemini 2.5 Pro)")
+    print(f"1. NATIVE MULTIMODAL MODE ({model})")
     print("-"*60)
-    
+
     agent_native = MultimodalAgent(
-        model="gemini-2.5-pro",
+        model=model,
         mode=ExtractionMode.NATIVE,
         enable_tools=False
     )
@@ -59,7 +76,7 @@ async def compare_extraction_modes(file_path: str, query: str):
     print("-"*60)
     
     agent_extract = MultimodalAgent(
-        model="gemini-2.5-pro",
+        model=model,
         mode=ExtractionMode.EXTRACT_TO_TEXT,
         enable_tools=False
     )
@@ -84,7 +101,7 @@ async def compare_extraction_modes(file_path: str, query: str):
     print("-"*60)
     
     agent_tools = MultimodalAgent(
-        model="gemini-2.5-pro",
+        model=model,
         mode=ExtractionMode.EXTRACT_TO_TEXT,
         enable_tools=True
     )
@@ -214,31 +231,109 @@ async def demo_conversation_with_tools():
             print("(File might not exist - this is a demo)")
 
 
-async def main():
-    """Run all demos"""
-    
-    import sys
-    
+def build_parser() -> argparse.ArgumentParser:
+    """构建实验 3-7 的命令行接口。"""
+    parser = argparse.ArgumentParser(
+        description=(
+            "实验 3-7：多模态信息提取的三种技术范式对比（原生多模态 / 提取为文本 / 带工具）。\n"
+            "将同一多模态文件和同一问题分别交给三种模式处理，观察表现差异。"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "示例：\n"
+            "  # 先离线生成含图表的样例（无需 API Key）\n"
+            "  python demo.py --generate-sample\n"
+            "  # 用生成的图表跑三种范式对比（需要 API Key）\n"
+            "  python demo.py --file test_files/sample_chart.png \\\n"
+            '      --query \"Which quarter had the highest revenue, and what was the exact value?\"\n'
+            "  # 兼容旧写法（位置参数）\n"
+            "  python demo.py document.pdf \"总结这份文档的要点\""
+        ),
+    )
+    parser.add_argument(
+        "file", nargs="?", default=None,
+        help="要处理的多模态文件（图像 / PDF 文档 / 音频）。也可用 --file 指定",
+    )
+    parser.add_argument(
+        "query", nargs="?", default=None,
+        help="向该文件提出的问题。也可用 --query 指定",
+    )
+    parser.add_argument(
+        "--file", dest="file_opt", default=None,
+        help="要处理的多模态文件（等价于位置参数 file）",
+    )
+    parser.add_argument(
+        "--query", dest="query_opt", default=None,
+        help="向该文件提出的问题（等价于位置参数 query）",
+    )
+    parser.add_argument(
+        "--model", default="gemini-2.5-pro",
+        help="原生 / 提取模式使用的模型（默认：gemini-2.5-pro）",
+    )
+    parser.add_argument(
+        "--skip-model-comparison", action="store_true",
+        help="只跑三种范式对比，跳过跨模型对比",
+    )
+    parser.add_argument(
+        "--generate-sample", action="store_true",
+        help="离线生成含图表的样例文件到 test_files/ 后退出（无需 API Key）",
+    )
+    parser.add_argument(
+        "--output", "-o", default=None,
+        help="将完整对比结果同时写入指定文件（如 result.txt）",
+    )
+    return parser
+
+
+async def run_comparison(file_path: str, query: str, model: str, skip_model_comparison: bool):
+    """运行三种范式对比，可选跨模型对比。"""
     print("="*80)
     print("MULTIMODAL AGENT DEMO")
     print("="*80)
-    
-    # Check for command line arguments
-    if len(sys.argv) > 2:
-        file_path = sys.argv[1]
-        query = sys.argv[2]
-        
-        # Run comparison demos
-        await compare_extraction_modes(file_path, query)
+
+    await compare_extraction_modes(file_path, query, model=model)
+    if not skip_model_comparison:
         await compare_models(file_path, query)
-        
-    else:
-        print("\nUsage: python demo.py <file_path> <query>")
-        print("Example: python demo.py document.pdf 'What is the main topic?'")
-        print("\nRunning demo conversation instead...\n")
-        
-        # Run conversation demo
+
+
+async def main():
+    """实验入口：解析参数并运行对比。"""
+    parser = build_parser()
+    args = parser.parse_args()
+
+    # 离线样例生成：不需要 API Key，直接产出图表 + PDF 报告
+    if args.generate_sample:
+        import create_sample
+        sys.argv = ["create_sample.py"]  # 用默认输出目录 test_files/
+        create_sample.main()
+        return
+
+    file_path = args.file_opt or args.file
+    query = args.query_opt or args.query
+
+    # 缺少文件或问题时，回退到无需真实文件的对话演示
+    if not file_path or not query:
+        print("="*80)
+        print("MULTIMODAL AGENT DEMO")
+        print("="*80)
+        print("\n未提供 <file> 与 <query>，改为运行对话演示。")
+        print("用法：python demo.py --file <文件> --query <问题>")
+        print("先生成样例：python demo.py --generate-sample\n")
         await demo_conversation_with_tools()
+        return
+
+    # 支持 --output：把整段对比结果同时落盘
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as fh:
+            original_stdout = sys.stdout
+            sys.stdout = _Tee(original_stdout, fh)
+            try:
+                await run_comparison(file_path, query, args.model, args.skip_model_comparison)
+            finally:
+                sys.stdout = original_stdout
+        print(f"\n完整对比结果已写入：{args.output}")
+    else:
+        await run_comparison(file_path, query, args.model, args.skip_model_comparison)
 
 
 if __name__ == "__main__":

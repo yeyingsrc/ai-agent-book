@@ -21,6 +21,8 @@ Both approaches are optimized for handling large technical documentation like th
 - Community detection for identifying related concepts
 - Hierarchical community summarization
 - Graph-based search with multiple strategies
+- **Multi-hop relation traversal** (`GraphRAGIndexer.multi_hop_search`)：沿关系边做多跳遍历，
+  回答扁平向量检索无法表达的「A 通过什么与 B 相连」这类关系性问题（对应书中「多跳关系推理」）
 - Support for different entity types (instructions, registers, features, etc.)
 
 ### HTTP API Service
@@ -50,30 +52,83 @@ cp env.example .env
 
 ## Quick Start
 
-### Using the Command Line Interface
+### 命令行接口（CLI）
 
-1. **Build an index from a document:**
+所有子命令都提供中文 `--help`：`python main.py --help`、`python main.py demo --help` 等。
+
+```
+usage: main.py [-h] {build,query,demo,serve} ...
+  build   从文档构建结构化索引（需要 OPENAI_API_KEY）
+  query   查询已构建的索引（需要 OPENAI_API_KEY 及已有索引）
+  demo    离线对比演示：结构化索引 vs 扁平检索（无需 API Key）
+  serve   启动 HTTP API 服务
+```
+
+#### 0. 离线对比演示（无需 API Key，推荐先跑这个）
+
+这是理解实验 3-8 的最快入口：它用一个手工整理的 Intel x86 SIMD 小知识库，
+直观对比「扁平检索」与「结构化索引」在三类查询上的差异，全程无需 OpenAI API：
+
 ```bash
-# Build both RAPTOR and GraphRAG indexes
+# 运行内置的三组对比查询（多跳关系推理 / 跨节点综合对比 / 多层次导航）
+python main.py demo
+
+# 自定义查询，同时给出扁平检索与图多跳遍历两种视角
+python main.py demo --query "VADDPS 用到哪个寄存器"
+
+# 把结果写入 JSON
+python main.py demo --output demo_result.json
+```
+
+演示输出示例（多跳关系推理，扁平检索答不了、图检索沿关系边可达）：
+
+```
+【查询 1｜多跳关系推理】运行 ADDPS 指令前，操作系统必须把哪个控制寄存器位置 1？
+-- 扁平检索（按词面相似度返回独立片段）--
+  1. [control-bit] CR4.OSFXSR  (score=0.459)
+  ...
+  ✗ 只能召回词面相近的孤立片段，无法把 ADDPS 与某个控制位「连」起来。
+-- 结构化图检索（沿关系边多跳遍历）--
+  ADDPS --属于--> SSE --需要启用--> CR4.OSFXSR
+  ✓ 答案：CR4.OSFXSR（从 ADDPS 经 2 跳可达）
+```
+
+> 说明：`build` 与 `query` 需要真实索引，而索引构建依赖 LLM（实体抽取、递归摘要），
+> 因此需要设置 `OPENAI_API_KEY`（嵌入用本地 `sentence-transformers`）。`demo`
+> 则把索引结果预先手工写好，让读者无需 API Key 也能看到结构化索引解决的问题。
+
+#### 1. 构建索引（需要 OPENAI_API_KEY）
+
+```bash
+# 同时构建 RAPTOR 与 GraphRAG 索引
 python main.py build path/to/document.pdf
 
-# Build only RAPTOR index
+# 只构建 RAPTOR，或只构建 GraphRAG
 python main.py build path/to/document.pdf --type raptor
-
-# Build only GraphRAG index
 python main.py build path/to/document.pdf --type graphrag
+
+# 将索引统计写入 JSON
+python main.py build path/to/document.pdf --output stats.json
 ```
 
-2. **Query the indexes:**
+#### 2. 查询索引
+
 ```bash
-# Query both indexes
+# 查询两种索引
 python main.py query "What are the MOV instruction variants?"
 
-# Query specific index with custom result count
+# 指定索引类型与返回条数
 python main.py query "explain SSE instructions" --type raptor --top-k 10
+
+# GraphRAG 多跳关系遍历：以召回的最佳实体为起点，沿关系边走 N 跳
+python main.py query "SSE registers" --type graphrag --multi-hop 2
+
+# 将查询结果写入 JSON
+python main.py query "control registers" --output result.json
 ```
 
-3. **Start the API server:**
+#### 3. 启动 API 服务
+
 ```bash
 python main.py serve
 ```
@@ -141,6 +196,7 @@ structured-index/
 ├── graphrag_indexer.py    # GraphRAG graph-based indexing
 ├── document_processor.py  # Document parsing and preprocessing
 ├── api_service.py         # HTTP API service
+├── structured_vs_flat_demo.py  # 离线对比演示：结构化索引 vs 扁平检索（无需 API）
 ├── main.py               # CLI interface
 ├── requirements.txt      # Python dependencies
 ├── env.example          # Environment variables template

@@ -729,35 +729,130 @@ class InteractiveContextualRAG:
 
 
 def main():
-    """Main entry point"""
+    """主入口：实验 3-12 上下文感知检索增强用户记忆"""
     parser = argparse.ArgumentParser(
-        description="Contextual RAG with Advanced Memory Cards"
+        description=(
+            "实验 3-12：利用上下文感知检索增强用户记忆。\n"
+            "在把对话记忆块送入嵌入/索引前先生成『上下文前缀』，"
+            "提升脱离上下文的孤立片段（如『好的，就订这个吧』）的召回。"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "示例：\n"
+            "  python main.py --mode compare                 # 离线对比上下文化 vs 原始块（无需 API）\n"
+            "  python main.py --mode compare --query '我的护照什么时候过期？'  # 单条查询离线检索对比\n"
+            "  python main.py --mode compare --output results/compare.json    # 保存对比结果\n"
+            "  python main.py --mode evaluate --category layer1               # 端到端评估（需 API/检索服务）\n"
+            "  python main.py --mode interactive             # 交互式界面（默认，需 API）\n"
+        ),
     )
     parser.add_argument(
         "--mode",
-        choices=["interactive", "evaluate", "demo"],
+        choices=["interactive", "evaluate", "demo", "compare"],
         default="interactive",
-        help="Execution mode"
+        help="运行模式：interactive 交互式(默认) / evaluate 端到端评估 / demo 演示 / compare 离线对比(无需 API)",
     )
     parser.add_argument(
         "--category",
         choices=["layer1", "layer2", "layer3"],
-        help="Test category for evaluation"
+        help="评估的测试分类（layer1 基础回忆 / layer2 多会话检索 / layer3 主动服务）",
     )
     parser.add_argument(
         "--config",
         type=str,
-        help="Path to configuration file"
+        help="配置文件（JSON）路径",
     )
-    
+    # 离线对比（compare 模式）相关参数
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default=None,
+        help="compare 模式使用的记忆问答对照集 JSON（默认：memory_qa_eval.json）",
+    )
+    parser.add_argument(
+        "--query",
+        type=str,
+        default=None,
+        help="compare 模式下对单条查询做离线检索对比（plain vs contextual 的 Top-K）",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="将 compare / evaluate 的结果保存为 JSON 的路径",
+    )
+    # 配置覆盖项（可选，覆盖环境变量/配置文件；不改变默认行为）
+    parser.add_argument(
+        "--user-id",
+        type=str,
+        default=None,
+        help="用户标识（写入输出结果作为标签，便于区分多用户记忆）",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="覆盖 LLM 模型名（默认取环境变量/提供商默认值）",
+    )
+    parser.add_argument(
+        "--provider",
+        type=str,
+        default=None,
+        help="覆盖 LLM 提供商（kimi / doubao / siliconflow / openai 等）",
+    )
+    parser.add_argument(
+        "--store-path",
+        type=str,
+        default=None,
+        help="记忆块存储（chunk_store）路径，覆盖默认 data/chunk_store.json",
+    )
+    contextual_group = parser.add_mutually_exclusive_group()
+    contextual_group.add_argument(
+        "--contextual",
+        dest="contextual",
+        action="store_true",
+        default=None,
+        help="启用上下文化（索引前为每块生成上下文前缀，默认开启）",
+    )
+    contextual_group.add_argument(
+        "--no-contextual",
+        dest="contextual",
+        action="store_false",
+        help="关闭上下文化（直接索引原始对话块，用于对照）",
+    )
+
     args = parser.parse_args()
-    
+
+    # compare 模式：完全离线，无需加载 LLM / 检索服务配置
+    if args.mode == "compare":
+        from contextual_compare import (
+            run_comparison,
+            single_query,
+            DEFAULT_DATASET,
+        )
+        dataset = args.dataset or DEFAULT_DATASET
+        if args.query:
+            single_query(dataset, args.query)
+        else:
+            run_comparison(dataset, output_path=args.output)
+        return
+
     # Load configuration
     if args.config:
         config = Config.load(args.config)
     else:
         config = Config.from_env()
-    
+
+    # 应用命令行覆盖项
+    if args.provider:
+        config.llm.provider = args.provider
+    if args.model:
+        config.llm.model = args.model
+    if args.store_path:
+        config.index.chunk_store_path = args.store_path
+    if args.contextual is not None:
+        config.index.enable_contextual = args.contextual
+
     if args.mode == "interactive":
         # Interactive mode
         app = InteractiveContextualRAG(config)

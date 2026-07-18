@@ -97,16 +97,21 @@ Chunks are enhanced with:
 
 ### Prerequisites
 - Python 3.8+
-- **Retrieval Pipeline Service** running on port 4242 (see below)
-- API keys for:
-  - Kimi/Moonshot or another supported LLM provider (for agent responses)
-  - OpenAI API (optional, for LLM evaluation)
+- **Retrieval Pipeline Service on port 4242 is now OPTIONAL.** By default the indexer
+  uses `retrieval_backend="auto"`: it uses the external pipeline if it is reachable,
+  otherwise it transparently falls back to a **built-in, dependency-free local BM25
+  index** so the whole chunk → index → retrieve path runs fully offline.
+- API keys are only needed for the LLM-driven parts:
+  - A supported LLM provider (Kimi/Moonshot, OpenAI, SiliconFlow, DeepSeek, ...) for
+    agent answer generation (`--mode batch`/`interactive`/`demo`).
+  - The **offline comparison demo (`--mode offline-demo`) needs NO API key and NO
+    port 4242 service.**
 
 ### Installation
 
 ```bash
-# Clone the project
-cd projects/week3/agentic-rag-for-user-memory
+# Enter the project
+cd chapter3/agentic-rag-for-user-memory
 
 # Install dependencies
 pip install -r requirements.txt
@@ -116,33 +121,73 @@ cp env.example .env
 # Edit .env with your API keys
 ```
 
-### Start the Retrieval Pipeline (Required)
+### Retrieval Backend (offline by default, pipeline optional)
 
-This project uses the external retrieval pipeline service for indexing and search:
+The retrieval backend is selectable via `--backend` (or `IndexConfig.retrieval_backend`):
+
+| value      | behavior                                                                 |
+|------------|--------------------------------------------------------------------------|
+| `auto`     | default — use the port-4242 pipeline if reachable, else local BM25        |
+| `local`    | always use the built-in offline BM25 index (no external service)         |
+| `pipeline` | always use the external retrieval pipeline on port 4242                   |
+
+To use the external pipeline (for dense/hybrid embeddings + reranking), start it first:
 
 ```bash
-# In a separate terminal, start the retrieval pipeline
-cd projects/week3/retrieval-pipeline
-python api_server.py
+# In a separate terminal (OPTIONAL)
+cd ../retrieval-pipeline
+python api_server.py   # serves http://localhost:4242
 ```
-
-The retrieval pipeline must be running on `http://localhost:4242` before using this system.
 
 ### Running the Demo
 
 ```bash
+# Offline comparison demo — NO API key, NO port 4242 needed.
+# Shows agentic multi-hop memory retrieval beating naive single-query recall,
+# on the multi-session layer2_01_multiple_vehicles case, with a metric table.
+python main.py --mode offline-demo
+python offline_demo.py                     # equivalent, standalone entry point
+python offline_demo.py --output results/offline_demo.json   # also dump JSON
+
 # Test the system setup
 python test_pipeline.py
 
 # Run interactive mode
 python main.py
 
-# Quick demo with a simple test case
+# Quick demo with a simple test case (needs an LLM API key)
 python main.py --mode demo
 
-# Batch evaluation of a category
-python main.py --mode batch --category layer1
+# Batch evaluation of a category (needs an LLM API key; --backend local stays offline)
+python main.py --mode batch --category layer1 --backend local
 ```
+
+### Offline demo result (reproducible)
+
+Running `python offline_demo.py` on `layer2_01_multiple_vehicles` (user owns a Honda
+Accord with a scheduled Firestone service and a Tesla Model 3 without one, discussed
+across two separate calls) yields, from real BM25 retrieval:
+
+| metric                              | naive single-query | agentic multi-hop |
+|-------------------------------------|:------------------:|:-----------------:|
+| retrieval queries issued            | 1                  | 5                 |
+| memory chunks retrieved             | 3                  | 5                 |
+| decisive-evidence recall            | **50%**            | **100%**          |
+| can fully disambiguate & answer     | no                 | yes               |
+
+The naive query is dominated by "schedule service" keywords and misses the Honda
+appointment-confirmation chunk (`FS-447291`). The agentic strategy discovers the
+second vehicle from the first-round results, issues focused follow-up queries per
+vehicle, and recovers the missing evidence. The recall numbers are computed from
+actual retrieval, not hard-coded.
+
+### CLI flags (`main.py`)
+
+`--mode {interactive,batch,demo,offline-demo}`, `--category`, `--test-id`, `--query`,
+`--provider`, `--model`, `--index-mode {dense,sparse,hybrid}`,
+`--backend {auto,local,pipeline}`, `--top-k`, `--rounds-per-chunk`, `--store-path`,
+`--test-cases-dir`, `--output`, `--config`. Run `python main.py --help` for the
+(Chinese) descriptions.
 
 ## 📖 Usage Guide
 
@@ -283,10 +328,12 @@ The system now correctly sets both parameters to respect your requested result c
 
 ### Retrieval Pipeline Connection
 **Problem**: Cannot connect to retrieval pipeline  
-**Solution**: 
-- Start the service: `cd projects/week3/retrieval-pipeline && python main.py`
+**Solution**: This is no longer fatal — with `--backend auto` (default) the system logs a
+warning and falls back to the built-in local BM25 backend. If you specifically want the
+external pipeline:
+- Start the service: `cd ../retrieval-pipeline && python api_server.py`
 - Verify it's running on `http://localhost:4242`
-- Check firewall settings if connection fails
+- Or force offline mode explicitly with `--backend local`
 
 ## 📄 License
 

@@ -582,47 +582,131 @@ class InteractiveRAGEvaluator:
                     console.print(f"[red]Demo failed: {e}[/red]")
 
 
+def _apply_cli_overrides(config: Config, args) -> Config:
+    """把命令行参数覆盖到配置上（未指定的项保持默认，不改变原有行为）。"""
+    if args.provider:
+        config.llm.provider = args.provider
+    if args.model:
+        config.llm.model = args.model
+    if args.index_mode:
+        config.index.mode = IndexMode(args.index_mode)
+    if args.backend:
+        config.index.retrieval_backend = args.backend
+    if args.store_path:
+        config.index.index_path = args.store_path
+    if args.test_cases_dir:
+        config.evaluation.test_cases_dir = args.test_cases_dir
+    if args.rounds_per_chunk:
+        config.chunking.rounds_per_chunk = args.rounds_per_chunk
+    if args.top_k:
+        config.agent.max_search_results = args.top_k
+    return config
+
+
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description="Agentic RAG for User Memory Evaluation"
+        description="实验 3-10 · 智能体化 RAG 用户记忆评估系统",
+        epilog=(
+            "示例:\n"
+            "  python main.py                              # 交互式菜单（默认）\n"
+            "  python main.py --mode offline-demo          # 离线对比演示，无需 API / port 4242\n"
+            "  python main.py --mode batch --category layer2 --backend local\n"
+            "  python main.py --mode batch --test-id layer2_01_multiple_vehicles --provider openai\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to configuration file"
+        "--config", type=str,
+        help="配置文件（JSON）路径"
     )
     parser.add_argument(
         "--mode",
-        choices=["interactive", "batch", "demo"],
+        choices=["interactive", "batch", "demo", "offline-demo"],
         default="interactive",
-        help="Execution mode"
+        help="运行模式：interactive 交互菜单（默认）/ batch 批量评估 / demo 快速演示 / offline-demo 离线检索对比"
     )
     parser.add_argument(
         "--category",
         choices=["layer1", "layer2", "layer3"],
-        help="Category to evaluate (batch mode)"
+        help="批量模式下要评估的难度层次"
     )
     parser.add_argument(
-        "--test-id",
-        type=str,
-        help="Specific test ID to evaluate"
+        "--test-id", type=str,
+        help="指定要评估的单个用例 ID"
     )
     parser.add_argument(
-        "--output",
-        type=str,
-        help="Output file for results"
+        "--query", type=str,
+        help="offline-demo 模式下覆盖用例自带的用户问题"
     )
-    
+    parser.add_argument(
+        "--provider", type=str,
+        help="LLM 提供商（如 openai / kimi / siliconflow / deepseek 等）"
+    )
+    parser.add_argument(
+        "--model", type=str,
+        help="LLM 模型名，覆盖提供商默认模型"
+    )
+    parser.add_argument(
+        "--index-mode", choices=["dense", "sparse", "hybrid"],
+        help="检索策略：dense 稠密 / sparse 稀疏(BM25) / hybrid 混合"
+    )
+    parser.add_argument(
+        "--backend", choices=["auto", "local", "pipeline"],
+        help="检索后端：auto 自动（默认，pipeline 不可用则本地）/ local 内置离线 BM25 / pipeline 外部 4242 服务"
+    )
+    parser.add_argument(
+        "--top-k", type=int,
+        help="每次记忆检索返回的记忆块数量"
+    )
+    parser.add_argument(
+        "--rounds-per-chunk", type=int,
+        help="对话历史分块时每块的轮数（默认 20）"
+    )
+    parser.add_argument(
+        "--store-path", type=str,
+        help="记忆索引的存储路径前缀（默认 indexes/memory_index）"
+    )
+    parser.add_argument(
+        "--test-cases-dir", type=str,
+        help="评估集 test_cases 目录（默认 ../user-memory-evaluation/test_cases）"
+    )
+    parser.add_argument(
+        "--output", type=str,
+        help="结果输出文件路径"
+    )
+
     args = parser.parse_args()
-    
+
+    # offline-demo 模式：委托给完全离线的对比演示脚本
+    if args.mode == "offline-demo":
+        import offline_demo
+        demo_args = offline_demo.build_parser().parse_args([])
+        if args.test_id:
+            demo_args.test_id = args.test_id
+        if args.query:
+            demo_args.query = args.query
+        if args.top_k:
+            demo_args.top_k = args.top_k
+        if args.rounds_per_chunk:
+            demo_args.rounds_per_chunk = args.rounds_per_chunk
+        if args.test_cases_dir:
+            demo_args.test_cases_dir = args.test_cases_dir
+        if args.output:
+            demo_args.output = args.output
+        offline_demo.run_demo(demo_args)
+        return
+
     # Load configuration
     config = None
     if args.config:
         config = Config.load(args.config)
     else:
         config = Config.from_env()
-    
+
+    # 应用命令行覆盖项
+    config = _apply_cli_overrides(config, args)
+
     if args.mode == "interactive":
         # Interactive mode
         evaluator = InteractiveRAGEvaluator(config)

@@ -145,8 +145,12 @@ Remember: Your credibility depends on providing accurate, well-sourced informati
             if tool_name == "search_memory":
                 query = arguments.get("query", "")
                 filter_test_id = arguments.get("filter_test_id")
-                
-                result = self.memory_tools.search_memory(query, filter_test_id)
+
+                result = self.memory_tools.search_memory(
+                    query,
+                    top_k=self.config.agent.max_search_results,
+                    filter_test_id=filter_test_id,
+                )
                 
                 # Log result to console
                 result_dict = result.to_dict()

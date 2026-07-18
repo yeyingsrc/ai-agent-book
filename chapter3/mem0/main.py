@@ -2,6 +2,8 @@
 
 import asyncio
 import argparse
+import json
+import os
 from pathlib import Path
 from typing import Optional
 import sys
@@ -75,8 +77,8 @@ class InteractiveSession:
             console.print("[yellow]No active session[/yellow]")
             return
         
-        memories = self.agent.memory.get_all(user_id=self.current_user)
-        
+        memories = self.agent.get_all_memories(user_id=self.current_user)
+
         if not memories:
             console.print("[yellow]No memories found[/yellow]")
             return
@@ -225,19 +227,143 @@ async def run_batch_mode(agent: Mem0Agent, input_file: Path, output_file: Path) 
     console.print(f"[green]Results saved to {output_file}[/green]")
 
 
+def _load_add_messages(text: str):
+    """Resolve the --text argument for a memory add operation.
+
+    If it points to an existing JSON file, load it (expects a message list
+    or a string); otherwise treat the argument itself as a user utterance.
+    """
+    if os.path.exists(text):
+        with open(text, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return text
+
+
+async def run_memory_op(agent: Mem0Agent, args) -> None:
+    """Run a single direct memory operation (add/search/get-all/history/delete).
+
+    This exposes mem0's memory API on the command line so the extract-
+    compare-decide pipeline (ADD/UPDATE/DELETE/NOOP) is observable turn by
+    turn, independent of the chat loop.
+    """
+    op = args.op
+    if not op:
+        console.print("[red]memory 模式需要 --op 参数（add/search/get-all/history/delete）[/red]")
+        sys.exit(1)
+
+    result = None
+
+    if op == "add":
+        if not args.text:
+            console.print("[red]add 操作需要 --text 参数（一段对话文本，或 JSON 消息文件路径）[/red]")
+            sys.exit(1)
+        messages = _load_add_messages(args.text)
+        events = await asyncio.to_thread(agent.add_memory, messages, args.user_id, args.agent_id)
+        console.print(f"[green]写入完成，记忆流水线（提取—对比—决策）产生的事件：[/green]")
+        if events:
+            for ev in events:
+                console.print(f"  [{ev['event']}] {ev['memory']}  [dim](id={ev['id']})[/dim]")
+        else:
+            console.print("  [dim]（没有 ADD/UPDATE/DELETE —— 候选事实被判定为 NOOP 重复信息）[/dim]")
+        result = {"op": "add", "user_id": args.user_id, "events": events}
+
+    elif op == "search":
+        if not args.query:
+            console.print("[red]search 操作需要 --query 参数[/red]")
+            sys.exit(1)
+        hits = await asyncio.to_thread(agent.search_memory, args.query, args.user_id, args.agent_id)
+        console.print(f"[green]检索到 {len(hits)} 条相关记忆：[/green]")
+        for mem in hits:
+            console.print(f"  - {mem.get('memory', mem.get('text', 'N/A'))}  [dim](id={mem.get('id','')})[/dim]")
+        result = {"op": "search", "query": args.query, "user_id": args.user_id, "memories": hits}
+
+    elif op == "get-all":
+        memories = await asyncio.to_thread(agent.get_all_memories, args.user_id, args.agent_id)
+        console.print(f"[green]用户 {args.user_id} 共有 {len(memories)} 条记忆：[/green]")
+        for i, mem in enumerate(memories, 1):
+            console.print(f"  {i}. {mem.get('memory', mem.get('text', 'N/A'))}  [dim](id={mem.get('id','')})[/dim]")
+        result = {"op": "get-all", "user_id": args.user_id, "memories": memories}
+
+    elif op == "history":
+        if not args.memory_id:
+            console.print("[red]history 操作需要 --memory-id 参数[/red]")
+            sys.exit(1)
+        history = await asyncio.to_thread(agent.memory_history, args.memory_id)
+        console.print(f"[green]记忆 {args.memory_id} 的修改历史：[/green]")
+        for entry in history:
+            console.print(f"  - {entry}")
+        result = {"op": "history", "memory_id": args.memory_id, "history": history}
+
+    elif op == "delete":
+        if not args.memory_id:
+            console.print("[red]delete 操作需要 --memory-id 参数[/red]")
+            sys.exit(1)
+        await asyncio.to_thread(agent.delete_memory, args.memory_id)
+        console.print(f"[green]已删除记忆 {args.memory_id}[/green]")
+        result = {"op": "delete", "memory_id": args.memory_id}
+
+    if args.output and result is not None:
+        with open(args.output, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2, default=str)
+        console.print(f"[green]结果已写入 {args.output}[/green]")
+
+
+CLI_EPILOG = """\
+示例：
+  python main.py                              # 默认进入交互式对话（记忆随对话自动写入/检索）
+  python main.py --mode demo --user-id u1     # 运行“北京→上海”记忆流水线演示（ADD/UPDATE/DELETE/NOOP）
+  python main.py --mode memory --op add   --text "我住在北京，是一名后端工程师" --user-id u1
+  python main.py --mode memory --op search --query "这个用户住在哪里？" --user-id u1
+  python main.py --mode memory --op get-all --user-id u1 --output mem.json
+  python main.py --mode batch  --input conversations.json --output results.json
+  python main.py --mode benchmark --model kimi/k3
+
+说明：memory / demo / interactive / batch / benchmark 均需要可用的 LLM API（KIMI_API_KEY）
+及向量存储；Mem0 的记忆提取与检索依赖在线模型调用。
+"""
+
+
 async def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Mem0 Agent with Kimi K3")
-    parser.add_argument("--mode", choices=["interactive", "batch", "benchmark"], 
-                       default="interactive", help="Execution mode")
-    parser.add_argument("--input", type=str, help="Input file for batch mode")
-    parser.add_argument("--output", type=str, help="Output file for batch mode")
-    parser.add_argument("--config", type=str, help="Configuration file path")
+    parser = argparse.ArgumentParser(
+        description="Mem0 记忆智能体（Kimi K3）— 演示 Mem0 的“提取—对比—决策”记忆流水线",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=CLI_EPILOG,
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["interactive", "batch", "benchmark", "memory", "demo"],
+        default="interactive",
+        help="运行模式：interactive 交互对话（默认）/ batch 批量对话 / benchmark 跑 LOCOMO 基准 / "
+             "memory 直接调用记忆操作 / demo 记忆流水线演示",
+    )
+    parser.add_argument(
+        "--op",
+        choices=["add", "search", "get-all", "history", "delete"],
+        help="memory 模式下的记忆操作：add 写入 / search 检索 / get-all 列出全部 / "
+             "history 查看某条记忆的修改历史 / delete 删除",
+    )
+    parser.add_argument("--text", type=str,
+                        help="add 操作的对话输入：一段文本，或指向 JSON 消息列表文件的路径")
+    parser.add_argument("--query", type=str, help="search 操作的查询语句")
+    parser.add_argument("--memory-id", type=str, help="history / delete 操作针对的记忆 ID")
+    parser.add_argument("--user-id", type=str, default="user_001",
+                        help="记忆归属的用户 ID（默认 user_001）")
+    parser.add_argument("--agent-id", type=str, default="agent_001",
+                        help="智能体 ID（默认 agent_001）")
+    parser.add_argument("--model", type=str,
+                        help="覆盖 MODEL_NAME，指定对话模型（如 kimi/k3）")
+    parser.add_argument("--input", type=str, help="batch 模式的输入 JSON 文件")
+    parser.add_argument("--output", type=str,
+                        help="将结果写入的 JSON 文件（memory / batch 模式）")
+    parser.add_argument("--config", type=str, help="配置文件路径（预留）")
     args = parser.parse_args()
-    
+
     # Initialize configuration
     config = Config.from_env()
-    
+    if args.model:
+        config.kimi.model_name = args.model
+
     # Initialize agent
     console.print("[yellow]Initializing Mem0 agent...[/yellow]")
     try:
@@ -246,7 +372,7 @@ async def main():
     except Exception as e:
         console.print(f"[red]Failed to initialize agent: {e}[/red]")
         sys.exit(1)
-    
+
     # Run based on mode
     if args.mode == "interactive":
         session = InteractiveSession(agent)
@@ -256,6 +382,11 @@ async def main():
             console.print("[red]Batch mode requires --input and --output arguments[/red]")
             sys.exit(1)
         await run_batch_mode(agent, Path(args.input), Path(args.output))
+    elif args.mode == "memory":
+        await run_memory_op(agent, args)
+    elif args.mode == "demo":
+        from quickstart import memory_pipeline_example
+        await memory_pipeline_example(agent=agent, user_id=args.user_id)
     elif args.mode == "benchmark":
         # Import and run benchmark
         from experiment import LOCOMOBenchmark

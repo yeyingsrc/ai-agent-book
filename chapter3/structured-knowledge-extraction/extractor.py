@@ -1,81 +1,114 @@
 """
-阶段 1：知识提取 Agent —— 用 LLM 从判例文本中抽取结构化因子。
+阶段 2：结构化抽取 —— 用发现出来的 schema 从判例文本抽取结构化因子。
 
-输入：一段自然语言判决书事实描述。
-输出：符合 schema 的结构化 JSON（金额 + 若干是非情节）。
+流程：
+  1. 先判定案件罪名（从 schema 已知的罪名里选）；
+  2. 按「核心通用因子 + 该罪名扩展因子」逐项抽取，输出结构化 JSON；
+  3. 文本未提及的因子返回 null（供对话 Agent 判断"还缺什么信息"）；
+  4. 带磁盘缓存（data/extracted.jsonl），一次性抽取后重跑几乎免费。
 
-要点：
-  - 使用 response_format=json_object 强制模型输出 JSON；
-  - 文本未提及的因子返回 null（对话 Agent 会据此判断"还缺什么信息"，从而追问）；
-  - 提供 extract_dataset()，带磁盘缓存，避免每次重跑都重复调用 LLM 花钱。
+输出统一为 {"charge": <罪名>, <factor_key>: <值|null>, ...}。
 """
 import json
 import os
 
 from config import MODEL, get_client
-from schema import ALL_FACTORS, BOOL_FACTORS
+from discovery import factors_for_charge, load_schema
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 CACHE_PATH = os.path.join(DATA_DIR, "extracted.jsonl")
 
-_FIELD_LINES = "\n".join(
-    f'  - "{f.key}": {"金额数值(元, 整数)" if f.kind == "amount" else "true/false"}'
-    f"  # {f.name_cn}"
-    for f in ALL_FACTORS
-)
 
-SYSTEM_PROMPT = f"""你是一名协助司法数据分析的信息抽取助手。
-请从给定的刑事判决书「事实」段落中，抽取以下结构化因子，并只输出一个 JSON 对象：
-{_FIELD_LINES}
-
-规则：
-1. amount 为盗窃/涉案财物金额，单位为元，输出整数（去掉"元""人民币"等字样）。
-2. 其余字段为布尔值：文本明确支持则 true，明确否定或表明相反情形则 false。
-3. 如果某字段在文本中完全没有相关信息，则取值 null（不要臆测）。
-4. 只输出 JSON，不要任何解释性文字。"""
+def _factor_lines(factors):
+    lines = []
+    for f in factors:
+        if f["kind"] == "numeric":
+            t = "数值(整数，去掉单位)"
+        elif f["kind"] == "bool":
+            t = "true/false"
+        else:
+            t = "取值之一：" + "/".join(f.get("values", [])) if f.get("values") else "分类取值"
+        lines.append(f'  - "{f["key"]}": {t}  # {f["name_cn"]}')
+    return "\n".join(lines)
 
 
-def extract_one(fact_text: str, client=None) -> dict:
-    """从单条判例文本抽取结构化因子。返回 dict，键与 schema 一致。"""
+def _charges(schema):
+    return list(schema.get("extensions", {}).keys())
+
+
+def extract_one(fact_text, schema=None, client=None, charge=None):
+    """从单条判例文本抽取 {charge, factors...}。缺失因子取 null。
+
+    charge 已知时（数据集抽取）直接沿用，省一次调用；未知时（对话新案情）先让 LLM 判定。
+    """
+    schema = schema or load_schema()
     client = client or get_client()
+    charges = _charges(schema)
+
+    # 第 1 步：判定罪名（仅在未提供时调用 LLM）
+    if charge is None:
+        charge_resp = client.chat.completions.create(
+            model=MODEL, temperature=0,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content":
+                    "判断下述刑事案件属于哪个罪名，只能从这些里选："
+                    + "/".join(charges) + '。只输出 {"charge": "..."}。'},
+                {"role": "user", "content": fact_text},
+            ],
+        )
+        charge = json.loads(charge_resp.choices[0].message.content).get("charge")
+    if charge not in charges:  # 兜底：默认第一个罪名
+        charge = charges[0]
+
+    # 第 2 步：按该罪名适用的因子抽取
+    factors = factors_for_charge(schema, charge)
+    sys = (
+        "你是协助司法数据分析的信息抽取助手。请从判决书「事实」段落中抽取以下因子，"
+        "只输出一个 JSON 对象：\n" + _factor_lines(factors) + "\n\n规则：\n"
+        "1. 数值因子输出整数（去掉'元''人民币''名'等字样）。\n"
+        "2. 是非因子：文本明确支持则 true，明确否定则 false。\n"
+        "3. 分类因子只能取给定取值之一。\n"
+        "4. 文本完全没有相关信息的因子取 null（不要臆测）。\n"
+        "5. 只输出 JSON，不要解释。"
+    )
     resp = client.chat.completions.create(
-        model=MODEL,
-        temperature=0,
+        model=MODEL, temperature=0,
         response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"判决书事实段落：\n{fact_text}"},
-        ],
+        messages=[{"role": "system", "content": sys},
+                  {"role": "user", "content": f"判决书事实段落：\n{fact_text}"}],
     )
     raw = json.loads(resp.choices[0].message.content)
-    return _normalize(raw)
+    return _normalize(raw, charge, factors)
 
 
-def _normalize(raw: dict) -> dict:
-    """把 LLM 输出规整成统一类型：amount->int|None，bool 字段->bool|None。"""
-    out = {}
-    amount = raw.get("amount")
-    if isinstance(amount, str):
-        amount = "".join(ch for ch in amount if ch.isdigit()) or None
-    out["amount"] = int(amount) if amount not in (None, "") else None
-    for f in BOOL_FACTORS:
-        v = raw.get(f.key)
-        out[f.key] = bool(v) if isinstance(v, bool) else (None if v is None else bool(v))
+def _normalize(raw, charge, factors):
+    out = {"charge": charge}
+    for f in factors:
+        v = raw.get(f["key"])
+        if v is None or v == "":
+            out[f["key"]] = None
+        elif f["kind"] == "numeric":
+            if isinstance(v, str):
+                digits = "".join(ch for ch in v if ch.isdigit())
+                out[f["key"]] = int(digits) if digits else None
+            else:
+                out[f["key"]] = int(v)
+        elif f["kind"] == "bool":
+            out[f["key"]] = bool(v) if isinstance(v, bool) else str(v).lower() in ("true", "1", "是")
+        else:  # categorical
+            out[f["key"]] = str(v)
     return out
 
 
-def load_dataset() -> list:
-    """读取合成判例数据集。"""
+def load_dataset():
     path = os.path.join(DATA_DIR, "cases.jsonl")
     with open(path, encoding="utf-8") as fh:
         return [json.loads(line) for line in fh if line.strip()]
 
 
-def extract_dataset(use_cache: bool = True, verbose: bool = True) -> list:
-    """对整个数据集做抽取，带缓存。
-
-    返回 list，每项为 {id, fact, gold, label_months, extracted}。
-    """
+def extract_dataset(schema, use_cache=True, verbose=True):
+    """对整个数据集抽取，带缓存。返回 list，每项含原案例字段 + `extracted`。"""
     cases = load_dataset()
     cache = {}
     if use_cache and os.path.exists(CACHE_PATH):
@@ -86,20 +119,19 @@ def extract_dataset(use_cache: bool = True, verbose: bool = True) -> list:
                     cache[rec["id"]] = rec["extracted"]
 
     client = get_client()
-    results = []
-    n_called = 0
+    results, n_called = [], 0
     for c in cases:
         if c["id"] in cache:
             extracted = cache[c["id"]]
         else:
-            extracted = extract_one(c["fact"], client=client)
+            extracted = extract_one(c["fact"], schema=schema, client=client,
+                                    charge=c.get("charge"))
             cache[c["id"]] = extracted
             n_called += 1
             if verbose:
-                print(f"  抽取 {c['id']} ... 完成")
+                print(f"  抽取 {c['id']} ({extracted.get('charge')}) ... 完成")
         results.append({**c, "extracted": extracted})
 
-    # 落盘缓存
     with open(CACHE_PATH, "w", encoding="utf-8") as fh:
         for r in results:
             fh.write(json.dumps({"id": r["id"], "extracted": r["extracted"]},
@@ -107,19 +139,3 @@ def extract_dataset(use_cache: bool = True, verbose: bool = True) -> list:
     if verbose:
         print(f"  本次实际调用 LLM {n_called} 次，其余命中缓存。")
     return results
-
-
-def extraction_accuracy(results: list) -> dict:
-    """把抽取结果和 gold 真值对比，报告每个字段的准确率（用于验证抽取质量）。"""
-    fields = ["amount"] + [f.key for f in BOOL_FACTORS]
-    correct = {k: 0 for k in fields}
-    total = len(results)
-    for r in results:
-        gold, ext = r["gold"], r["extracted"]
-        # amount 允许 1 元误差（一般应完全相等）
-        if ext.get("amount") is not None and abs(ext["amount"] - gold["amount"]) <= 1:
-            correct["amount"] += 1
-        for f in BOOL_FACTORS:
-            if ext.get(f.key) == gold[f.key]:
-                correct[f.key] += 1
-    return {k: correct[k] / total for k in fields}

@@ -1,4 +1,8 @@
-# 生成的抽取缓存与训练产物（运行 demo.py 时自动生成，不应入库）。
+# 运行 demo.py 时自动生成的产物（发现的 schema、抽取缓存、聚类模型），不应入库。
 # 注意：data/cases.jsonl 是自带的小样本合成数据集，需保留入库。
+data/schema.json
 data/extracted.jsonl
-data/factor_model.json
+data/archetypes.json
+.env
+__pycache__/
+*.pyc

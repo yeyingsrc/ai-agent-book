@@ -23,6 +23,42 @@ Assesses whether the agent can synthesize information across multiple conversati
 - **Flexible Framework**: Supports interactive, batch, and programmatic evaluation modes
 - **Detailed Reporting**: Generates comprehensive evaluation reports with scores and insights
 
+## Quickstart: Scored Comparison of Memory Systems (Experiment 3-1)
+
+The headline use of this repo is **comparing memory systems** on the three-layer
+suite and reading off a scored table. This runs **fully offline** (no API key)
+using the `keyword-recall` metric on the canned fixtures in `fixtures/`:
+
+```bash
+python main.py --mode compare --metric keyword-recall
+```
+
+Real output (8 annotated test cases, four memory configurations):
+
+```
+             Memory System Comparison (Keyword Recall, 0.000-1.000)
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Layer                         ┃ full_ctx  ┃ json_card ┃ simple_nt ┃ no_memry ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━┩
+│ Layer 1 · Basic Recall        │  1.000    │  1.000    │  0.417    │  0.000   │
+│ Layer 2 · Disambiguation      │  1.000    │  1.000    │  0.333    │  0.000   │
+│ Layer 3 · Proactive Synthesis │  1.000    │  1.000    │  0.125    │  0.000   │
+│ Overall                       │  1.000    │  1.000    │  0.323    │  0.000   │
+└───────────────────────────────┴───────────┴───────────┴───────────┴──────────┘
+```
+
+The scores are **computed** from `fixtures/system_responses.example.json` by the
+recall metric (not hand-written); they reproduce the book's observation that
+*Simple Notes* clears most Layer-1 recall cases but degrades sharply on the
+Layer-2/3 cases that need disambiguation and cross-session synthesis, whereas
+*Advanced JSON Cards* holds up across all three layers.
+
+- `fixtures/gold_facts.json` — the key facts each answer must recall, transcribed
+  verbatim from the `test_cases/*.yaml` conversations (no invented values).
+- `fixtures/system_responses.example.json` — illustrative answers from four
+  configurations. Replace it with real outputs from your own memory system
+  (format: `{system_name: {test_id: answer}}`) to benchmark it against the set.
+
 ## Installation
 
 1. Clone the repository
@@ -38,6 +74,34 @@ cp env.example .env
 ```
 
 ## Usage
+
+The CLI ships with a Chinese `--help`; run `python main.py --help` for the full
+list. Key flags:
+
+| Flag | Meaning |
+| --- | --- |
+| `--mode {interactive,demo,batch,compare}` | Run mode (default `interactive`) |
+| `--metric {llm-judge,keyword-recall}` | Scorer: LLM-as-judge (needs API) or offline key-fact recall |
+| `--responses PATH` | Answers JSON (`batch`: `{test_id: ans}`; `compare`: `{system: {test_id: ans}}`) |
+| `--gold PATH` | Gold-fact annotations for `keyword-recall` (default `fixtures/gold_facts.json`) |
+| `--category {layer1,layer2,layer3}` | Restrict to one layer |
+| `--test-cases-dir PATH` | Alternate test-case (dataset) directory |
+| `--evaluator {kimi,openai}` / `--model NAME` | Judge backend / model override for `llm-judge` |
+| `--output PATH` | Report output file |
+| `--list` | Offline: list all test cases and exit |
+
+### Compare Mode (cross-system scored table)
+
+```bash
+# Offline, deterministic (no API):
+python main.py --mode compare --metric keyword-recall --output compare.txt
+
+# Only the hardest layer:
+python main.py --mode compare --metric keyword-recall --category layer3
+
+# LLM-as-judge scoring of the same systems (requires API key):
+python main.py --mode compare --metric llm-judge --evaluator kimi
+```
 
 ### Interactive Mode
 
@@ -142,7 +206,19 @@ Each test case contains:
 
 ## Evaluation Metrics
 
-The framework evaluates based on:
+Two interchangeable scorers produce a continuous reward in `[0.0, 1.0]`:
+
+### 1. `keyword-recall` (offline, deterministic)
+
+Key-fact recall: `reward = (# gold facts found in the answer) / (# gold facts)`,
+using normalized substring matching (case/whitespace-insensitive; a fact may list
+several acceptable surface forms). Requires no API key, so it powers the offline
+comparison table. Gold facts live in `fixtures/gold_facts.json`.
+
+### 2. `llm-judge` (LLM-as-judge, needs API)
+
+Uses a judge LLM (Kimi or OpenAI) to score semantic quality against the test
+case's `evaluation_criteria` and `expected_behavior`, considering:
 
 1. **Information Retrieval**: Did the agent find the required information?
 2. **Completeness**: For ambiguous queries, did it retrieve ALL relevant information?

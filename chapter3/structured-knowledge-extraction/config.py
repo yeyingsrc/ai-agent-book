@@ -2,9 +2,10 @@
 全局配置：加载环境变量、提供 OpenAI 客户端与默认模型名。
 
 只依赖官方 OpenAI SDK，读取 OPENAI_API_KEY。
-默认模型 gpt-4o-mini（便宜、够用于结构化抽取与文案生成）。
+默认模型 gpt-4o-mini（便宜、够用于因子发现、结构化抽取与文案生成）。
 """
 import os
+
 from openai import OpenAI
 
 try:
@@ -20,19 +21,12 @@ MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
 def get_client() -> OpenAI:
-    """返回一个配置好的 OpenAI 客户端。
-
-    仅使用官方 OpenAI 端点（读取 OPENAI_API_KEY / 可选 OPENAI_BASE_URL）。
-    """
+    """返回一个配置好的 OpenAI 客户端（仅使用官方端点，读取 OPENAI_API_KEY）。"""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError(
             "未找到 OPENAI_API_KEY，请先 `cp env.example .env` 并填入你的 OpenAI Key。"
         )
-    base_url = os.getenv("OPENAI_BASE_URL")  # 一般不需要设置
-    # timeout + 自动重试：抽取阶段要连续发几十次请求，单次瞬时错误（网络抖动/
-    # 限流/5xx）不应中断整条流水线。
-    kwargs = dict(api_key=api_key, timeout=60.0, max_retries=2)
-    if base_url:
-        kwargs["base_url"] = base_url
-    return OpenAI(**kwargs)
+    # timeout + 自动重试：发现/抽取阶段要连续发几十次请求，单次瞬时错误
+    # （网络抖动 / 限流 / 5xx）不应中断整条流水线。
+    return OpenAI(api_key=api_key, timeout=60.0, max_retries=2)

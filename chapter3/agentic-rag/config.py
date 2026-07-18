@@ -21,6 +21,7 @@ class Provider(str, Enum):
 
 class KnowledgeBaseType(str, Enum):
     """Knowledge base backend types"""
+    OFFLINE = "offline"  # In-process BM25 over local law corpus (no server, no API)
     LOCAL = "local"  # Local retrieval pipeline
     DIFY = "dify"    # Dify knowledge base API
     RAPTOR = "raptor"  # RAPTOR tree-based index
@@ -120,7 +121,11 @@ class LLMConfig:
 class KnowledgeBaseConfig:
     """Knowledge base configuration"""
     type: KnowledgeBaseType = KnowledgeBaseType.LOCAL
-    
+
+    # Offline in-process BM25 backend config (no external server / no API key)
+    offline_corpus_path: str = "laws"
+    offline_top_k: int = 5
+
     # Local retrieval pipeline config
     local_base_url: str = "http://localhost:4242"
     local_top_k: int = 3

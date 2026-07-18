@@ -42,6 +42,12 @@ class PipelineConfig:
     # Retrieval settings
     default_top_k: int = 20  # Number of candidates to retrieve from each service
     rerank_top_k: int = 10  # Number of results after reranking
+
+    # Fusion settings (see fusion.py)
+    # "rrf": Reciprocal Rank Fusion (rank-only, robust); "weighted": weighted
+    # min-max normalized score fusion; "avg_rank": legacy average-rank ordering.
+    fusion_method: str = "rrf"
+    rrf_k: int = 60  # RRF smoothing constant
     
     # Logging
     debug: bool = True

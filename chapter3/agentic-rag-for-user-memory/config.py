@@ -136,12 +136,19 @@ class IndexConfig:
     chunk_store_path: str = "data/chunk_store.json"
     enable_contextual: bool = True  # Add contextual information to chunks
     contextual_window: int = 2  # Number of surrounding rounds for context
+    # Retrieval backend selection:
+    #   "auto"     -> use the port-4242 retrieval pipeline if reachable, otherwise fall back
+    #                 to a built-in, dependency-free local BM25 index (works fully offline)
+    #   "local"    -> always use the built-in local BM25 index (no external service needed)
+    #   "pipeline" -> always use the external retrieval pipeline on port 4242
+    retrieval_backend: str = "auto"
+    retrieval_url: str = "http://localhost:4242"  # External retrieval pipeline endpoint
 
 
 @dataclass
 class EvaluationConfig:
     """Configuration for evaluation framework"""
-    test_cases_dir: str = "../../week2/user-memory-evaluation/test_cases"
+    test_cases_dir: str = "../user-memory-evaluation/test_cases"
     results_dir: str = "results"
     enable_verbose: bool = True
     save_trajectories: bool = True
@@ -186,7 +193,13 @@ class Config:
         
         if index_mode := os.getenv("INDEX_MODE"):
             config.index.mode = IndexMode(index_mode)
-        
+
+        if backend := os.getenv("RETRIEVAL_BACKEND"):
+            config.index.retrieval_backend = backend
+
+        if test_cases_dir := os.getenv("TEST_CASES_DIR"):
+            config.evaluation.test_cases_dir = test_cases_dir
+
         return config
     
     def save(self, path: str):

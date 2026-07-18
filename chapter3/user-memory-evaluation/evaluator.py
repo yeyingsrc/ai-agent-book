@@ -11,9 +11,16 @@ from models import TestCase, EvaluationResult
 class LLMEvaluator:
     """LLM-based evaluator for agent responses."""
     
-    def __init__(self, evaluator_type: Optional[str] = None):
-        """Initialize the evaluator with specified LLM."""
+    def __init__(self, evaluator_type: Optional[str] = None, model: Optional[str] = None):
+        """Initialize the evaluator with specified LLM.
+
+        Args:
+            evaluator_type: Judge backend (kimi/openai); defaults to config.
+            model: Optional model name that overrides the configured default.
+        """
         self.config = Config.get_evaluator_config(evaluator_type)
+        if model:
+            self.config["model"] = model
         self.client = self._create_client()
         
     def _create_client(self) -> openai.OpenAI:
@@ -239,9 +246,9 @@ IMPORTANT:
 class BatchEvaluator:
     """Evaluator for running multiple test cases."""
     
-    def __init__(self, evaluator_type: Optional[str] = None):
+    def __init__(self, evaluator_type: Optional[str] = None, model: Optional[str] = None):
         """Initialize the batch evaluator."""
-        self.evaluator = LLMEvaluator(evaluator_type)
+        self.evaluator = LLMEvaluator(evaluator_type, model=model)
     
     def evaluate_test_suite(
         self,

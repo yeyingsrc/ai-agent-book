@@ -243,21 +243,23 @@ class UserMemoryEvaluationFramework:
         agent_responses: Dict[str, str],
         extracted_memories: Optional[Dict[str, str]] = None,
         category: Optional[str] = None,
-        evaluator_type: Optional[str] = None
+        evaluator_type: Optional[str] = None,
+        model: Optional[str] = None
     ) -> Dict[str, EvaluationResult]:
         """
         Evaluate multiple test cases in batch.
-        
+
         Args:
             agent_responses: Dictionary mapping test_id to agent response
             extracted_memories: Optional dictionary mapping test_id to extracted memory
             category: Optional filter by category
             evaluator_type: Optional evaluator type
-            
+            model: Optional model name override for the judge LLM
+
         Returns:
             Dictionary mapping test_id to evaluation result
         """
-        batch_evaluator = BatchEvaluator(evaluator_type)
+        batch_evaluator = BatchEvaluator(evaluator_type, model=model)
         test_cases = self.list_test_cases(category)
         
         return batch_evaluator.evaluate_test_suite(

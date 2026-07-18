@@ -27,6 +27,41 @@ def _reasoning_safe_temperature(model, requested=1.0):
     return 1 if ("kimi-k3" in m or "gpt-5" in m) else requested
 
 
+def _as_memory_list(result: Any) -> List[Dict[str, Any]]:
+    """Normalize a mem0 return value to a plain list of memory dicts.
+
+    mem0 >=1.0 returns ``{"results": [...], "relations": [...]}`` from
+    ``search``/``get_all``, whereas older versions returned a bare list.
+    Accepting either form keeps the agent working across mem0 versions
+    (iterating the dict directly would otherwise yield the string keys).
+    """
+    if isinstance(result, dict):
+        return result.get("results", []) or []
+    if isinstance(result, list):
+        return result
+    return []
+
+
+def _extract_memory_events(add_result: Any) -> List[Dict[str, str]]:
+    """Extract ADD/UPDATE/DELETE decisions from a mem0 ``add`` return value.
+
+    Mem0's "extract-compare-decide" pipeline judges every candidate fact
+    against existing memories and emits one of ADD (brand-new), UPDATE
+    (revise an existing memory), DELETE (retract a contradicted memory)
+    or NOOP (duplicate, nothing changes). ``add`` surfaces the non-NOOP
+    decisions; this returns them as ``[{"event", "memory", "id"}]`` so the
+    book's four-way decision is visible to callers.
+    """
+    events = []
+    for item in _as_memory_list(add_result):
+        events.append({
+            "event": item.get("event", "ADD"),
+            "memory": item.get("memory", item.get("text", "")),
+            "id": item.get("id", ""),
+        })
+    return events
+
+
 # Set up logging
 logging.basicConfig(
     level=getattr(logging, default_config.logging.level),
@@ -221,8 +256,9 @@ Guidelines:
         # Record assistant response
         context.add_turn("assistant", response)
         
-        # Store interaction in memory
-        self.memory.add(
+        # Store interaction in memory. mem0 runs its extract-compare-decide
+        # pipeline here and returns the ADD/UPDATE/DELETE decisions it made.
+        add_result = self.memory.add(
             messages=[
                 {"role": "user", "content": user_input},
                 {"role": "assistant", "content": response}
@@ -235,13 +271,15 @@ Guidelines:
                 "timestamp": datetime.now().isoformat()
             }
         )
-        
+        memory_events = _extract_memory_events(add_result)
+
         # Calculate metrics
         metrics = {
             "generation_time": generation_time,
             "response_length": len(response),
             "turn_count": context.turn_count,
-            "memory_count": len(self.memory.get_all(user_id=context.user_id))
+            "memory_count": len(_as_memory_list(self.memory.get_all(user_id=context.user_id))),
+            "memory_events": memory_events
         }
         
         # Store performance metrics
@@ -254,6 +292,45 @@ Guidelines:
     async def process_turn_async(self, session_id: str, user_input: str) -> Tuple[str, Dict[str, Any]]:
         """Async version of process_turn."""
         return await asyncio.to_thread(self.process_turn, session_id, user_input)
+
+    # ------------------------------------------------------------------
+    # Direct memory operations (used by the CLI and the pipeline demo)
+    # ------------------------------------------------------------------
+    def add_memory(self, messages, user_id: str, agent_id: Optional[str] = None,
+                   metadata: Optional[Dict[str, Any]] = None) -> List[Dict[str, str]]:
+        """Add a message/conversation to memory.
+
+        Returns the ADD/UPDATE/DELETE decisions from mem0's pipeline. An
+        empty list means every candidate fact was judged NOOP (duplicate).
+        ``messages`` may be a plain string or an OpenAI-style message list.
+        """
+        add_result = self.memory.add(
+            messages=messages,
+            user_id=user_id,
+            agent_id=agent_id,
+            metadata=metadata or {}
+        )
+        return _extract_memory_events(add_result)
+
+    def search_memory(self, query: str, user_id: str, agent_id: Optional[str] = None,
+                      limit: int = 5) -> List[Dict[str, Any]]:
+        """Semantically retrieve memories relevant to ``query``."""
+        return _as_memory_list(self.memory.search(
+            query=query, user_id=user_id, agent_id=agent_id, limit=limit
+        ))
+
+    def get_all_memories(self, user_id: str, agent_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List every stored memory for a user."""
+        return _as_memory_list(self.memory.get_all(user_id=user_id, agent_id=agent_id))
+
+    def memory_history(self, memory_id: str) -> List[Dict[str, Any]]:
+        """Return the change history (ADD/UPDATE/DELETE audit trail) of one memory."""
+        return self.memory.history(memory_id)
+
+    def delete_memory(self, memory_id: str) -> str:
+        """Delete a single memory by id."""
+        self.memory.delete(memory_id)
+        return memory_id
     
     def evaluate_consistency(self, session_id: str) -> float:
         """Evaluate consistency of responses in a session."""
@@ -307,8 +384,8 @@ Guidelines:
     
     def evaluate_memory_retention(self, user_id: str) -> float:
         """Evaluate memory retention for a user."""
-        memories = self.memory.get_all(user_id=user_id)
-        
+        memories = _as_memory_list(self.memory.get_all(user_id=user_id))
+
         if not memories or len(memories) == 0:
             return 0.0
         

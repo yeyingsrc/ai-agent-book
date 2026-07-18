@@ -77,7 +77,9 @@ contextual-retrieval-for-user-memory/
 ├── contextual_indexer.py       # 双层记忆索引器（含LLM提取）
 ├── contextual_agent.py         # 结合双层记忆的Agent
 ├── contextual_evaluator.py     # 评估框架（含LLM Judge）
-├── main.py                     # 主入口（支持测试用例排序）
+├── contextual_compare.py       # 🆕 离线对比脚本：上下文化 vs 原始块的召回（无需 API）
+├── memory_qa_eval.json         # 🆕 离线对比用的受控记忆问答对照集
+├── main.py                     # 主入口（argparse，含 --mode compare 离线对比）
 ├── config.py                   # 配置管理
 ├── chunker.py                  # 基础分块器
 ├── tools.py                    # Agent工具
@@ -119,18 +121,54 @@ python api_server.py
 
 ## 使用示例
 
-### 运行评估
+### 离线对比：上下文化到底有没有用？（无需 API，推荐先跑这个）
+
+本实验的核心论点是：**在把对话记忆块送入嵌入/索引前，先为每块生成一段『上下文前缀』，能提升脱离上下文的孤立片段（如『好的，就订这个吧』）的召回。** `--mode compare` 提供一个**完全离线、无需任何 API Key 或检索服务**的受控对照实验来量化这一点。
+
+它用同一份上下文，分别度量『不拼接（plain）』与『拼接后再索引（contextual）』两种方式的召回，变量只有『索引文本是否含上下文前缀』，因此结果直接反映上下文化本身的贡献。检索采用确定性的 BM25 词法检索（纯 Python、无第三方依赖）作为神经嵌入的离线代理；对照数据集见 [`memory_qa_eval.json`](memory_qa_eval.json)（受控教学集，可用 `--dataset` 替换）。
 
 ```bash
-# 交互式界面（推荐）
+# 打印对比指标表（Recall@1 / Recall@3 / MRR）
+python main.py --mode compare
+# 等价于直接运行独立脚本：
+python contextual_compare.py
+
+# 对单条查询做 plain vs contextual 的 Top-K 检索对比
+python main.py --mode compare --query '我最后确认预订的那张机票是哪个航班？'
+
+# 保存完整结果（含逐查询名次明细）到 JSON
+python main.py --mode compare --output results/compare.json
+```
+
+实测输出（12 个记忆块、8 条查询的受控集）：
+
+```
+方法                            Recall@1  Recall@3       MRR
+--------------------------------------------------------------------
+Plain（直接索引原始块）               0.625     1.000     0.792
+Contextual（上下文化后索引）        0.750     1.000     0.875
+--------------------------------------------------------------------
+提升（Δ）                         +0.125    +0.000    +0.083
+```
+
+其中『我订的西雅图酒店确认了吗』这类查询，gold 记忆块（『可以，帮我订下来』）在 Plain 下排名第 3、上下文化后升到第 1——正是上下文前缀把孤立确认片段重新锚定回了『西雅图凯悦酒店』的情境。
+
+> 说明：这是一个**离线词法代理**，用于在无 API 环境下清晰地演示上下文化的机制与方向性收益。生产管线中，上下文前缀由 LLM 逐块生成、并用神经嵌入 + 混合检索索引（见下方 `--mode evaluate`），需要配置 API Key。
+
+### 端到端评估（需 API / 检索服务）
+
+```bash
+# 交互式界面（默认）
 python main.py
 
-# 评估特定分类
-python main.py --mode evaluate --category layer3
+# 评估特定分类（需 LLM 与检索管道服务）
+python main.py --mode evaluate --category layer1
 
-# 评估单个测试用例
-python main.py --mode single --test-id layer1_01_bank_account
+# 关闭上下文化做对照，并指定模型与输出
+python main.py --mode evaluate --category layer1 --no-contextual --model gpt-4o --output results/plain_eval.json
 ```
+
+完整命令行参数见 `python main.py --help`（含中文说明）。
 
 ### 交互式测试界面
 

@@ -8,6 +8,59 @@ An educational implementation of Anthropic's Contextual Retrieval technique, dem
 
 **The Solution**: Contextual Retrieval prepends chunk-specific explanatory context to each chunk before embedding and indexing, preserving semantic meaning.
 
+## 📊 核心实验：离线量化召回提升（实验 3-11）
+
+上面的 Key Insight 是本项目要验证的核心主张。`compare_retrieval.py` 用一组
+可控的对比实验**完全离线**地量化它：把同一批文本块分别以两种方式建 BM25 索引——
+无上下文（只索引原始文本）与有上下文（索引 LLM 生成的前缀 + 原始文本）——
+再在评测集 `evaluation/retrieval_eval.json`（15 条查询 + 人工标注 gold 文本块）
+上比较 `recall@k`（命中率）。**无需任何 API 或检索服务**（BM25 + jieba 分词）。
+
+```bash
+# 跑完整对比表（默认语料 document_store.json，默认评测集）
+python compare_retrieval.py
+
+# 查看每条查询的命中排名明细
+python compare_retrieval.py --per-query
+
+# 临时单条查询：并排看无上下文 / 有上下文的 Top-K 结果
+python compare_retrieval.py --query "国家主席有哪些职权？" --top-k 5
+
+# 只看无上下文基线 / 另存机器可读结果
+python compare_retrieval.py --mode plain
+python compare_retrieval.py --output result.json
+
+# 中文 --help
+python compare_retrieval.py --help
+```
+
+真实运行输出（22 个《宪法》《检察官法》文本块，15 条查询，jieba 分词）：
+
+```
+检索召回对比：无上下文分块  vs.  上下文感知检索（BM25）
+====================================================================
+方法                  recall@1    recall@3    recall@5
+----------------------------------------------------
+无上下文 (plain)          60.0%      86.7%      93.3%
+有上下文 (ctx)            86.7%      86.7%      93.3%
+----------------------------------------------------
+提升 (Δpp)             +26.7pp      +0.0pp      +0.0pp
+----------------------------------------------------
+失败率下降                    67%          0%          0%
+```
+
+结论与书中一致：为文本块补上上下文前缀显著提升 top-1 召回（60% → 86.7%，
+失败率 1−recall@1 下降 67%），前缀为 BM25 注入了“身份标签”式的可匹配关键词。
+这一提升在 recall@1 上最明显；`--query` 模式可直观看到前缀如何把“正确所属章节”
+的文本块重新排到前面。
+
+> `--method embedding` / `--method hybrid`（上下文向量嵌入 + RRF 融合）需要
+> 调用 embedding API，无法离线运行；脚本会给出提示并回退到 BM25 离线结果。
+> 稠密检索 + 重排序的完整实现见 `contextual_tools.py`。
+
+同一对比逻辑也内建在 `ContextualChunker.compare_retrieval_methods()` 中（书中
+`compare_retrieval_methods` 功能），可对任意一组 `ContextualChunk` 直接做并排检索对比。
+
 ## 📚 Educational Features
 
 This implementation includes extensive logging and comparison capabilities to understand:

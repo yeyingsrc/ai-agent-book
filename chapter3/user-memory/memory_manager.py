@@ -15,6 +15,15 @@ from config import Config, MemoryMode
 logger = logging.getLogger(__name__)
 
 
+def _normalize_text(text: str) -> str:
+    """Normalize text for duplicate detection: lowercase and collapse whitespace.
+
+    Used by the offline consolidation/dedup logic so that notes that differ only
+    in casing or spacing are recognised as the same fact.
+    """
+    return " ".join(str(text or "").lower().split())
+
+
 @dataclass
 class MemoryNote:
     """Represents a single memory note"""
@@ -252,6 +261,100 @@ class NotesMemoryManager(BaseMemoryManager):
             if query_lower in note.content.lower() or any(query_lower in tag.lower() for tag in note.tags):
                 results.append(note)
         return results
+
+    def consolidate_memories(self, resolve_conflicts: bool = True) -> Dict[str, Any]:
+        """Deterministically deduplicate and (optionally) conflict-resolve notes.
+
+        This is the offline counterpart to the LLM-driven memory maintenance in
+        the background processor. It runs without any API call so the storage /
+        dedup / versioned-conflict logic can be exercised and inspected directly.
+
+        Two passes:
+          1. Dedup - notes whose normalized content is identical are merged into
+             one (the most recently updated is kept, tags are unioned).
+          2. Conflict resolution - remaining notes are grouped by their
+             "attribute key" (the first tag, e.g. "home_address"). If notes in a
+             group carry different content they describe conflicting versions of
+             the same attribute; the most recently updated one wins and the older
+             versions are superseded. This is version-based conflict detection.
+
+        Args:
+            resolve_conflicts: When False only the dedup pass runs.
+
+        Returns:
+            A report dict describing what was merged / superseded and the final
+            note count. Nothing is written unless something actually changed.
+        """
+        report: Dict[str, Any] = {
+            "duplicates_removed": 0,
+            "merged_notes": [],
+            "conflicts_resolved": [],
+            "initial_count": len(self.notes),
+            "final_count": len(self.notes),
+        }
+
+        # --- Pass 1: deduplicate identical content ---------------------------
+        by_content: Dict[str, MemoryNote] = {}
+        deduped: List[MemoryNote] = []
+        for note in self.notes:
+            norm = _normalize_text(note.content)
+            existing = by_content.get(norm)
+            if existing is None:
+                by_content[norm] = note
+                deduped.append(note)
+                continue
+            # Duplicate found - keep whichever is newer, union the tags.
+            keeper, dropped = (existing, note) if existing.updated_at >= note.updated_at else (note, existing)
+            keeper.tags = sorted(set(keeper.tags) | set(dropped.tags))
+            keeper.updated_at = max(existing.updated_at, note.updated_at)
+            if keeper is note:  # replace the reference we already stored
+                idx = deduped.index(existing)
+                deduped[idx] = note
+                by_content[norm] = note
+            report["duplicates_removed"] += 1
+            report["merged_notes"].append(keeper.content)
+
+        # --- Pass 2: resolve conflicting versions of the same attribute ------
+        if resolve_conflicts:
+            groups: Dict[str, List[MemoryNote]] = {}
+            singletons: List[MemoryNote] = []
+            for note in deduped:
+                attr = note.tags[0] if note.tags else None
+                if attr is None:
+                    singletons.append(note)
+                else:
+                    groups.setdefault(attr, []).append(note)
+
+            kept: List[MemoryNote] = list(singletons)
+            for attr, members in groups.items():
+                distinct = {_normalize_text(m.content) for m in members}
+                if len(members) == 1 or len(distinct) == 1:
+                    # No conflict: single note, or identical content under one attr.
+                    kept.extend(members)
+                    continue
+                winner = max(members, key=lambda m: m.updated_at)
+                superseded = [m for m in members if m is not winner]
+                kept.append(winner)
+                report["conflicts_resolved"].append({
+                    "attribute": attr,
+                    "kept": winner.content,
+                    "superseded": [m.content for m in superseded],
+                })
+            deduped = kept
+
+        changed = len(deduped) != len(self.notes)
+        self.notes = deduped
+        report["final_count"] = len(self.notes)
+
+        if self.verbose and (report["duplicates_removed"] or report["conflicts_resolved"]):
+            print(f"  🧹 Consolidated memories: {report['initial_count']} → {report['final_count']} notes")
+            for c in report["conflicts_resolved"]:
+                print(f"     ⚔️  Conflict on '{c['attribute']}': kept \"{c['kept']}\", "
+                      f"superseded {c['superseded']}")
+
+        if changed:
+            self.save_memory()
+        return report
 
 
 class JSONMemoryManager(BaseMemoryManager):

@@ -273,62 +273,185 @@ def run_demo_evaluation():
         console.print(report)
 
 
+DEFAULT_GOLD_FACTS = str(Path(__file__).parent / "fixtures" / "gold_facts.json")
+DEFAULT_SYSTEM_RESPONSES = str(Path(__file__).parent / "fixtures" / "system_responses.example.json")
+
+
+def run_comparison(framework, args):
+    """Score several memory systems on the test suite and print a comparison table.
+
+    This is the offline path when ``--metric keyword-recall`` is used: it needs no
+    API key and produces real, computed scores from the canned system responses.
+    """
+    from comparison import ComparisonRunner
+    from metrics import load_gold_facts
+
+    responses_path = args.responses or DEFAULT_SYSTEM_RESPONSES
+    try:
+        with open(responses_path, "r", encoding="utf-8") as f:
+            system_responses = json.load(f)
+    except Exception as e:
+        console.print(f"[red]无法加载系统回答文件 {responses_path}: {e}[/red]")
+        return
+
+    gold_facts = {}
+    if args.metric == "keyword-recall":
+        try:
+            gold_facts = load_gold_facts(args.gold)
+        except Exception as e:
+            console.print(f"[red]无法加载 gold facts 文件 {args.gold}: {e}[/red]")
+            return
+
+    try:
+        runner = ComparisonRunner(
+            framework,
+            metric=args.metric,
+            gold_facts=gold_facts,
+            evaluator_type=args.evaluator,
+            model=args.model,
+        )
+    except ValueError as e:
+        # e.g. llm-judge selected but no API key configured
+        console.print(f"[red]{e}[/red]")
+        console.print("[yellow]提示：离线对比可改用 --metric keyword-recall（无需 API Key）。[/yellow]")
+        return
+
+    n_systems = len([s for s in system_responses if not s.startswith('_')])
+    console.print(f"[cyan]使用指标 [bold]{args.metric}[/bold] 对比 {n_systems} 个记忆系统...[/cyan]")
+    results_by_system = runner.run(system_responses, category=args.category)
+
+    table = runner.build_table(results_by_system)
+    console.print(table)
+
+    report = runner.generate_report(results_by_system)
+    with open(args.output, "w", encoding="utf-8") as f:
+        f.write(report)
+    console.print(f"[green]对比报告已保存至 {args.output}[/green]")
+
+
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="User Memory Evaluation Framework")
+    parser = argparse.ArgumentParser(
+        description="用户记忆评估框架（实验 3-1）：用三层次框架评估并对比不同记忆系统的召回质量。",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "示例：\n"
+            "  # 离线对比多个记忆系统（无需 API，使用关键事实召回指标）\n"
+            "  python main.py --mode compare --metric keyword-recall\n\n"
+            "  # 仅列出测试用例（离线）\n"
+            "  python main.py --list\n\n"
+            "  # 用 LLM-as-judge 评测单个系统的回答（需要配置 API Key）\n"
+            "  python main.py --mode batch --responses my_answers.json --metric llm-judge\n"
+        ),
+    )
     parser.add_argument(
         "--mode",
-        choices=["interactive", "demo", "batch"],
+        choices=["interactive", "demo", "batch", "compare"],
         default="interactive",
-        help="Evaluation mode"
+        help="运行模式：interactive 交互式菜单（默认）；demo 演示；batch 评测单个系统；compare 跨系统对比打分表",
+    )
+    parser.add_argument(
+        "--metric",
+        choices=["llm-judge", "keyword-recall"],
+        default="llm-judge",
+        help="评分指标：llm-judge 用 LLM 当评委（需 API）；keyword-recall 离线关键事实召回率（compare 场景常用）",
     )
     parser.add_argument(
         "--responses",
         type=str,
-        help="Path to JSON file with agent responses (for batch mode)"
+        help="回答 JSON 文件路径。batch 模式为 {test_id: 回答}；compare 模式为 {系统名: {test_id: 回答}}（compare 默认用内置示例）",
+    )
+    parser.add_argument(
+        "--gold",
+        type=str,
+        default=DEFAULT_GOLD_FACTS,
+        help="keyword-recall 指标使用的关键事实标注 JSON 路径（默认 fixtures/gold_facts.json）",
     )
     parser.add_argument(
         "--category",
         choices=["layer1", "layer2", "layer3"],
-        help="Filter test cases by category"
+        help="只评测某一层次的测试用例（layer1 基础回忆 / layer2 消歧 / layer3 主动服务）",
+    )
+    parser.add_argument(
+        "--test-cases-dir",
+        type=str,
+        default=None,
+        help="测试用例（评估集）目录，默认使用内置的 test_cases 目录",
+    )
+    parser.add_argument(
+        "--evaluator",
+        choices=["kimi", "openai"],
+        default=None,
+        help="LLM-as-judge 的后端（kimi 或 openai），默认读取配置/环境变量",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="覆盖评委 LLM 的模型名称（仅 llm-judge 指标生效）",
     )
     parser.add_argument(
         "--output",
         type=str,
         default="evaluation_report.txt",
-        help="Output file for evaluation report"
+        help="评测报告的输出文件路径",
     )
-    
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="离线列出所有测试用例后退出（可配合 --category、--test-cases-dir）",
+    )
+
     args = parser.parse_args()
-    
-    # Initialize framework
-    framework = UserMemoryEvaluationFramework()
-    
+
+    # Initialize framework (offline: loads the YAML test-case suite)
+    framework = UserMemoryEvaluationFramework(test_cases_dir=args.test_cases_dir)
+
+    # --list is an offline shortcut, independent of --mode
+    if args.list:
+        framework.display_test_case_summary(show_full_titles=True, by_category=True)
+        return
+
     if args.mode == "demo":
         run_demo_evaluation()
     elif args.mode == "interactive":
         evaluator = InteractiveEvaluator(framework)
         evaluator.run_interactive_session()
+    elif args.mode == "compare":
+        run_comparison(framework, args)
     elif args.mode == "batch":
         if not args.responses:
-            console.print("[red]Batch mode requires --responses file path[/red]")
+            console.print("[red]batch 模式需要通过 --responses 指定回答 JSON 文件[/red]")
             return
-        
-        with open(args.responses, 'r') as f:
+
+        with open(args.responses, 'r', encoding='utf-8') as f:
             agent_responses = json.load(f)
-        
-        results = framework.evaluate_batch(
-            agent_responses,
-            category=args.category
-        )
-        
+
+        if args.metric == "keyword-recall":
+            # Offline single-system scoring via the keyword-recall metric.
+            from metrics import KeywordRecallEvaluator, load_gold_facts
+            evaluator = KeywordRecallEvaluator(load_gold_facts(args.gold))
+            results = {}
+            for test_id, response in agent_responses.items():
+                test_case = framework.get_test_case(test_id)
+                if test_case and evaluator.has_gold(test_id):
+                    results[test_id] = evaluator.evaluate(test_case, response)
+        else:
+            results = framework.evaluate_batch(
+                agent_responses,
+                category=args.category,
+                evaluator_type=args.evaluator,
+                model=args.model,
+            )
+
         report = framework.generate_report(results, args.output)
         console.print(f"[green]Report saved to {args.output}[/green]")
         console.print(f"Evaluated {len(results)} test cases")
-        
+
         # Summary statistics
-        passed = sum(1 for r in results.values() if r.passed)
-        console.print(f"Passed: {passed}/{len(results)} ({100*passed/len(results):.1f}%)")
+        if results:
+            passed = sum(1 for r in results.values() if (r.passed if r.passed is not None else r.reward >= 0.8))
+            console.print(f"Passed: {passed}/{len(results)} ({100*passed/len(results):.1f}%)")
 
 
 if __name__ == "__main__":
