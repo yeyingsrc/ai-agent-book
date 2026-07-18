@@ -160,7 +160,16 @@ def llm_chat(client, tracker, agent, messages, json_mode=False, note=""):
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
 
-    resp = client.chat.completions.create(**kwargs)
+    try:
+        resp = client.chat.completions.create(**kwargs)
+    except Exception as e:
+        # 推理模型（如 gpt-5.x）只接受默认 temperature，会拒绝自定义值；
+        # 此时去掉 temperature 重试一次，保持其余参数不变。
+        if "temperature" in str(e).lower():
+            kwargs.pop("temperature", None)
+            resp = client.chat.completions.create(**kwargs)
+        else:
+            raise
     usage = resp.usage
     tracker.record(agent, usage.prompt_tokens, usage.completion_tokens, note)
     return resp.choices[0].message.content
