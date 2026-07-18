@@ -27,6 +27,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Load .env so API keys configured there are available via os.getenv.
+# (config.py calls load_dotenv() too, but main.py only imports agent, which
+#  does not import config, so we must trigger it here.)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 class AblationTestSuite:
     """Test suite for exploring context importance through ablation studies"""
