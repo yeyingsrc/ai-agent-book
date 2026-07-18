@@ -743,9 +743,9 @@ class ConnectionHandler {
           method: 'post',
           url: config.TTS_API_URL,
           data: {
-            "model": "fishaudio/fish-speech-1.5",
+            "model": (config.TTS_PROVIDERS?.[config.TTS_PROVIDER]?.model) || "FunAudioLLM/CosyVoice2-0.5B",
             "input": text,
-            "voice": "fishaudio/fish-speech-1.5:diana",
+            "voice": (config.TTS_PROVIDERS?.[config.TTS_PROVIDER]?.voice) || "FunAudioLLM/CosyVoice2-0.5B:diana",
             "response_format": "mp3",
             "sample_rate": 32000,
             "stream": true,

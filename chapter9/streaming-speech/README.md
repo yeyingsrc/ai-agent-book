@@ -43,15 +43,28 @@
 cd chapter9/streaming-speech
 pip install -r requirements.txt          # 另需本机 ffmpeg：brew install ffmpeg
 cp env.example .env                       # 填入 OPENAI_API_KEY（或直接 export）
-python demo.py
+python demo.py                             # 默认：TTS 合成 + 0.5s 粒度真实 Whisper 流式识别
 python demo.py --quick                     # 分块粒度放大到 1.5s，Whisper 调用减到约 1/3
 python demo.py --sentence "..." --chunk-step 0.5   # 自定义测试句与分块粒度
+python demo.py --audio my.wav              # 用现成音频作输入，跳过 TTS 合成
+python demo.py --compare-chunks            # 跨 0.5/1.0/2.0s 的分块粒度延迟对照表
+python demo.py --offline                   # 离线自检：不联网、不需 ffmpeg，用合成识别器
+python demo.py --offline --compare-chunks  # 离线合成的跨粒度延迟对照表
+python demo.py --output result.json        # 结果（逐块表/对照表）另存为 JSON
 python demo.py --help                      # 查看全部参数
 ```
 
-常用参数（`python demo.py --help`）：`--sentence`（测试句）、`--chunk-step`（分块粒度，
-默认 0.5s，越小分块越多越慢）、`--quick`（放大到 1.5s 快速演示）。`TTS_VOICE` /
-`ASR_LANGUAGE` 等仍可在 `demo.py` 顶部常量区调整。
+常用参数（`python demo.py --help`）：
+
+- `--sentence`：测试句（默认为书中同类的带时间信息的句子）。
+- `--chunk-step`：分块粒度（秒），默认 0.5，越小分块越多越慢。
+- `--quick`：把粒度放大到 1.5s 快速演示（Whisper 调用约 1/3）。
+- `--audio PATH`：用现成音频文件作输入，跳过 TTS 合成（离线模式忽略）。
+- `--compare-chunks [S1,S2,...]`：在多个分块粒度上各跑一遍，输出跨粒度延迟对照表；不带值时用默认 `0.5,1.0,2.0`（秒）。
+- `--offline`：**离线自检**，不联网、不需 ffmpeg、不需 Key，用**合成识别器**（SYNTHETIC）驱动同一套分块/计时逻辑——文本按前缀比例揭示、延迟为合成值，**仅验证流程、不代表任何真实模型性能**。
+- `--duration SEC`：离线模式下的整段时长（缺省按句子长度估算）。
+- `--tts-model` / `--voice` / `--asr-model` / `--language`：覆盖 TTS/ASR 模型与语言（默认 `tts-1` / `alloy` / `whisper-1` / `zh`）。
+- `--output PATH`：把结果另存为 JSON。
 
 ## 真实运行输出（节选，供参考）
 

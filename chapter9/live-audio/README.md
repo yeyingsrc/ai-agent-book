@@ -27,7 +27,7 @@ A real-time voice chat demo featuring speech-to-text, AI conversation, and text-
 - **ARK Doubao**: Low latency in China, optimized for Chinese language
 
 ### TTS (Text-to-Speech)
-- **Fish Audio** (via Siliconflow): Natural voice synthesis, multiple voices
+- **CosyVoice2** (via Siliconflow): Natural voice synthesis, multiple system voices
 
 ## Architecture Overview
 
@@ -187,7 +187,7 @@ export ANTHROPIC_API_KEY="your-anthropic-api-key"
      // Provider Selection - Choose your preferred providers
      ASR_PROVIDER: 'siliconflow',      // 'openai' or 'siliconflow'
      LLM_PROVIDER: 'ark',              // 'openai', 'openrouter-gpt4o', 'openrouter-gemini', 'ark'
-     TTS_PROVIDER: 'siliconflow',      // 'siliconflow' (Fish Audio)
+     TTS_PROVIDER: 'siliconflow',      // 'siliconflow' (CosyVoice2)
      
      // API Keys (loaded from environment variables)
      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -205,21 +205,21 @@ export ANTHROPIC_API_KEY="your-anthropic-api-key"
 ```javascript
 ASR_PROVIDER: 'siliconflow',      // 'openai' or 'siliconflow'
 LLM_PROVIDER: 'ark',              // 'openai', 'openrouter-gpt4o', 'openrouter-gemini', 'ark'
-TTS_PROVIDER: 'siliconflow',      // 'siliconflow' (Fish Audio)
+TTS_PROVIDER: 'siliconflow',      // 'siliconflow' (CosyVoice2)
 ```
 
 #### For Real-time Performance (Low Latency in US)
 ```javascript
 ASR_PROVIDER: 'openai',            // 'openai' or 'siliconflow'
 LLM_PROVIDER: 'openrouter-gemini', // 'openai', 'openrouter-gpt4o', 'openrouter-gemini', 'ark'
-TTS_PROVIDER: 'siliconflow',       // 'siliconflow' (Fish Audio)
+TTS_PROVIDER: 'siliconflow',       // 'siliconflow' (CosyVoice2)
 ```
 
 #### For Best Accuracy
 ```javascript
 ASR_PROVIDER: 'openai',           // Accurate Whisper
 LLM_PROVIDER: 'openrouter-gpt4o', // High-quality GPT-4o
-TTS_PROVIDER: 'siliconflow'       // Fish Audio
+TTS_PROVIDER: 'siliconflow'       // CosyVoice2
 ```
 
 ### 4. API Key Requirements
@@ -231,7 +231,7 @@ You only need the API keys for the providers you plan to use:
 | OpenAI | ✅ Whisper | ✅ GPT-4o | ❌ | `OPENAI_API_KEY` |
 | OpenRouter | ❌ | ✅ GPT-4o, Gemini | ❌ | `OPENROUTER_API_KEY` |
 | ARK (Doubao) | ❌ | ✅ Doubao | ❌ | `ARK_API_KEY` |
-| Siliconflow | ✅ SenseVoice | ❌ | ✅ Fish Audio | `SILICONFLOW_API_KEY` |
+| Siliconflow | ✅ SenseVoice | ❌ | ✅ CosyVoice2 | `SILICONFLOW_API_KEY` |
 
 ### 5. Configuration Validation
 
@@ -299,7 +299,7 @@ The test suite will automatically skip providers for which you don't have API ke
 
 - ✅ ASR provider functionality (OpenAI Whisper, SenseVoice)
 - ✅ LLM provider functionality (OpenAI, OpenRouter GPT-4o, OpenRouter Gemini, ARK Doubao)  
-- ✅ TTS provider functionality (Fish Audio via Siliconflow)
+- ✅ TTS provider functionality (CosyVoice2 via Siliconflow)
 - ✅ All provider combinations (8 ASR+LLM combinations)
 - ✅ Dynamic provider switching
 - ✅ Error handling and fallback mechanisms

@@ -10,8 +10,8 @@ const testConfig = {
   TTS_PROVIDERS: {
     siliconflow: {
       apiUrl: 'https://api.siliconflow.cn/v1/audio/speech',
-      model: 'fishaudio/fish-speech-1.5',
-      voice: 'fishaudio/fish-speech-1.5:diana',
+      model: 'FunAudioLLM/CosyVoice2-0.5B',
+      voice: 'FunAudioLLM/CosyVoice2-0.5B:diana',
       apiKey: 'SILICONFLOW_API_KEY'
     }
   }
@@ -27,7 +27,7 @@ const testTexts = {
 };
 
 /**
- * TTS Provider for Fish Audio via Siliconflow
+ * TTS Provider for CosyVoice2 via Siliconflow
  */
 class SiliconflowTTSProvider {
   constructor(config, apiKey) {
@@ -98,7 +98,7 @@ describe('TTS Providers - Individual Testing', function() {
     }
   });
   
-  describe('Fish Audio (Siliconflow) TTS Provider', function() {
+  describe('CosyVoice2 (Siliconflow) TTS Provider', function() {
     let provider;
     
     before(function() {
@@ -119,8 +119,8 @@ describe('TTS Providers - Individual Testing', function() {
     
     it('should initialize with correct configuration', function() {
       assert(provider, 'Provider should be created');
-      assert.strictEqual(provider.config.model, 'fishaudio/fish-speech-1.5', 'Should use Fish Speech model');
-      assert.strictEqual(provider.config.voice, 'fishaudio/fish-speech-1.5:diana', 'Should use diana voice');
+      assert.strictEqual(provider.config.model, 'FunAudioLLM/CosyVoice2-0.5B', 'Should use CosyVoice2 model');
+      assert.strictEqual(provider.config.voice, 'FunAudioLLM/CosyVoice2-0.5B:diana', 'Should use diana voice');
       assert.strictEqual(provider.config.apiUrl, 'https://api.siliconflow.cn/v1/audio/speech', 'Should use correct API URL');
       assert(provider.apiKey, 'Should have API key');
       console.log('📋 Siliconflow TTS Config:', {

@@ -39,7 +39,7 @@
 
 | 标记 | 中文写法 | 作用 |
 | --- | --- | --- |
-| `[EMO:neutral\|happy\|excited\|frustrated\|thinking]` | `[情感=中性\|高兴\|兴奋\|沮丧\|思考]` | 切换情绪 |
+| `[EMO:neutral\|happy\|frustrated\|thinking]` | `[情感=中性\|高兴\|沮丧\|思考]` | 切换情绪 |
 | `[SPEED:normal\|fast\|slow]` / `[SPEED:0.8x]` | `[语速=正常\|快\|慢]` | 切换语速 |
 | `[STYLE:formal\|casual]` | `[风格=正式\|轻松]` | 切换口吻 |
 
@@ -60,7 +60,7 @@
 
 ### 参考语音库
 
-`voice_library.py` 由 情绪(5) × 语速(3) × 风格(2) 笛卡尔积生成 **30 条**档案，全部固定
+`voice_library.py` 由 情绪(4) × 语速(3) × 风格(2) 笛卡尔积生成 **24 条**档案，全部固定
 `voice=alloy`（音色一致），仅 `instructions` 不同。可单独运行查看：
 
 ```bash
@@ -90,6 +90,11 @@ python demo.py                            # 生成 output/*.mp3
 | 参数 | 作用 |
 | --- | --- |
 | `--quick` | 只跑三种配置对比（A/B/C），跳过 5 个风格变体，减少 TTS 调用与耗时 |
+| `--text 文本` | 只合成这一段自定义文本（可内嵌控制标记，如 `[情感=高兴][THINKING]…`） |
+| `--emotion / --speed / --style` | 为 `--text` 指定情绪/语速/口吻（等价于在文本前加对应状态标记） |
+| `-o / --output 路径` | `--text` 模式的输出 mp3 路径（默认 `output/custom.mp3`） |
+| `--list-voices` | **离线**（无需 API key）：打印完整参考语音库（24 条档案及其 instructions） |
+| `--dump-mapping` | **离线**（无需 API key）：打印控制标记 → 动作映射表，并演示对示例文本的解析过程 |
 
 ## 预期输出示例（真实节选）
 

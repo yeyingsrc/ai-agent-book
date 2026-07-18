@@ -53,8 +53,8 @@ const config = {
   TTS_PROVIDERS: {
     siliconflow: {
       apiUrl: 'https://api.siliconflow.cn/v1/audio/speech',
-      model: 'fishaudio/fish-speech-1.5',
-      voice: 'fishaudio/fish-speech-1.5:diana',
+      model: 'FunAudioLLM/CosyVoice2-0.5B',
+      voice: 'FunAudioLLM/CosyVoice2-0.5B:diana',
       apiKey: 'SILICONFLOW_API_KEY'
     }
   },
