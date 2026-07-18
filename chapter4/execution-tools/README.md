@@ -71,6 +71,12 @@ AUTO_VERIFY_CODE=true
 - `kimi`/`moonshot`: kimi-k3
 - `openrouter`: google/gemini-2.5-pro (or openai/gpt-5, anthropic/claude-sonnet-4)
 
+> **Universal OpenRouter fallback**: when the configured `PROVIDER`'s key is
+> missing but `OPENROUTER_API_KEY` is set, the LLM steps (approval,
+> summarization, error/syntax analysis) transparently switch to `openrouter`
+> via `Config.effective_provider()`. Set `MODEL` to a `provider/model` id for
+> OpenRouter, e.g. `MODEL=openai/gpt-4o-mini`.
+
 ## Usage
 
 ### 命令行入口 (CLI)

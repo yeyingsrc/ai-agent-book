@@ -242,24 +242,19 @@ def make_mock_dispatch() -> Callable[[Event], None]:
 def make_agent_dispatch(provider: str, model: Optional[str],
                         max_iterations: int) -> Callable[[Event], None]:
     """真实处理器：接入 EventTriggeredAgent，由大模型处理每个事件。"""
-    from agent import EventTriggeredAgent, SystemHintConfig
+    from agent import EventTriggeredAgent, SystemHintConfig, resolve_provider_and_key
 
-    def _api_key_for(p: str) -> Optional[str]:
-        if p == "siliconflow":
-            return os.getenv("SILICONFLOW_API_KEY")
-        if p == "doubao":
-            return os.getenv("DOUBAO_API_KEY")
-        if p in ("kimi", "moonshot"):
-            return os.getenv("KIMI_API_KEY")
-        if p == "openrouter":
-            return os.getenv("OPENROUTER_API_KEY")
-        return None
-
-    api_key = _api_key_for(provider)
+    # 通用兜底：直连 provider 的 key 缺失时，若有 OPENROUTER_API_KEY 则自动改走 openrouter。
+    resolved_provider, api_key = resolve_provider_and_key(provider)
     if not api_key:
-        print(f"❌ 未检测到 provider '{provider}' 对应的 API Key。")
+        print(f"❌ 未检测到 provider '{provider}' 对应的 API Key（也未配置 OPENROUTER_API_KEY 兜底）。")
         print(f"   请先设置环境变量，或改用离线演示：python event_loop_demo.py --mock")
         sys.exit(1)
+    if resolved_provider != provider:
+        print(f"ℹ️  provider '{provider}' 无可用 Key，已自动改用 OpenRouter 兜底（openrouter）。")
+        provider = resolved_provider
+        # 保留已是 provider/model 形式的显式模型；否则让 openrouter 用其默认模型。
+        model = model if (model and "/" in model) else None
 
     config = SystemHintConfig(
         enable_timestamps=True,

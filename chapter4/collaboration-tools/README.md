@@ -110,6 +110,13 @@ OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-4o-mini
 ```
 
+> **Universal OpenRouter fallback**: all LLM entry points (`spawn_subagent`,
+> intelligence tools, browser-use) resolve credentials via `src/llm_fallback.py`.
+> When `OPENAI_API_KEY` is absent but `OPENROUTER_API_KEY` is set, they route
+> through OpenRouter (`base_url=https://openrouter.ai/api/v1`, model id mapped to
+> `provider/model` form, e.g. `gpt-4o-mini` → `openai/gpt-4o-mini`). With neither
+> key set, sub-agents run in deterministic offline mode (no fabricated output).
+
 ## Usage
 
 ### 命令行入口 (`main.py`)

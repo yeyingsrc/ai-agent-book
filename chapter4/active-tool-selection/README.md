@@ -188,6 +188,13 @@ cp env.example .env
 # Edit .env and add your API key
 ```
 
+> **Universal OpenRouter fallback**: if `OPENAI_API_KEY` is not set but
+> `OPENROUTER_API_KEY` is, `config.py` automatically routes through OpenRouter
+> (`base_url=https://openrouter.ai/api/v1`) and maps the model id to
+> `provider/model` form (`gpt-*` → `openai/…`, `claude-*` →
+> `anthropic/claude-opus-4.8`). Existing `OPENAI_BASE_URL`/`OPENAI_MODEL`
+> overrides are preserved.
+
 ### 3. Run Quick Start
 
 ```bash

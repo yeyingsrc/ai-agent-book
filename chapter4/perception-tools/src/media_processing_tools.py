@@ -21,6 +21,48 @@ from base import ActionResponse, validate_file_path
 load_dotenv()
 
 
+def _map_model_for_openrouter(model: str) -> str:
+    """Map a plain model id onto OpenRouter's `provider/model` form."""
+    if "/" in model:
+        return model
+    m = model.lower()
+    if m.startswith(("gpt-", "o1-", "o3-", "o4-")):
+        return f"openai/{model}"
+    if m.startswith("claude-"):
+        return "anthropic/claude-opus-4.8"
+    return model
+
+
+def _make_vision_client(default_model: str = "gpt-4o-mini"):
+    """Build an OpenAI-compatible vision client with a universal fallback.
+
+    Preferred path uses OPENAI_API_KEY directly. When it is absent but an
+    OPENROUTER_API_KEY is set, transparently route through OpenRouter (mapping
+    the model id to provider/model form) so the vision tools still run.
+
+    Returns (client, model). Raises ValueError with the accepted keys listed
+    when neither credential is available.
+    """
+    import os
+    from openai import OpenAI
+
+    model = os.getenv("PERCEPTION_VISION_MODEL", default_model)
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key:
+        base_url = os.getenv("OPENAI_BASE_URL")
+        client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+        return client, model
+
+    or_key = os.getenv("OPENROUTER_API_KEY")
+    if or_key:
+        client = OpenAI(api_key=or_key, base_url="https://openrouter.ai/api/v1")
+        return client, _map_model_for_openrouter(model)
+
+    raise ValueError(
+        "No LLM key configured. Set OPENAI_API_KEY or OPENROUTER_API_KEY (universal fallback)."
+    )
+
+
 async def transcribe_audio_whisper(
     file_path: str,
     model_size: str = "base",
@@ -286,26 +328,19 @@ async def analyze_image_ai(
         TextContent with AI analysis
     """
     try:
-        import os
-        from openai import OpenAI
-        
         path = validate_file_path(image_path)
-        
+
         logging.info(f"🤖 AI analyzing image: {path}")
-        
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not configured")
-        
-        client = OpenAI(api_key=api_key)
-        
+
+        client, model = _make_vision_client()
+
         # Encode image
         with open(path, "rb") as img_file:
             img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
-        
+
         # Call Vision API
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             messages=[
                 {
                     "role": "user",
@@ -322,14 +357,14 @@ async def analyze_image_ai(
             ],
             max_tokens=500
         )
-        
+
         analysis = response.choices[0].message.content
-        
+
         result = {
             "file_name": path.name,
             "prompt": prompt,
             "analysis": analysis,
-            "model": "gpt-4o-mini"
+            "model": model
         }
         
         logging.info(f"✅ AI analysis completed")
@@ -464,19 +499,12 @@ async def analyze_video_ai(
         TextContent with AI analysis
     """
     try:
-        import os
-        from openai import OpenAI
-        
         path = validate_file_path(video_path)
-        
+
         logging.info(f"🤖 AI analyzing video: {path}")
-        
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not configured")
-        
-        client = OpenAI(api_key=api_key)
-        
+
+        client, model = _make_vision_client()
+
         # Extract keyframes
         video = cv2.VideoCapture(str(path))
         fps = video.get(cv2.CAP_PROP_FPS)
@@ -500,7 +528,7 @@ async def analyze_video_ai(
                 
                 # Analyze with GPT-4 Vision
                 response = client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=model,
                     messages=[
                         {
                             "role": "user",

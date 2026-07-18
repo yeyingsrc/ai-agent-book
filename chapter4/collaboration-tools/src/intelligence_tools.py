@@ -10,9 +10,23 @@ from typing import Dict, Any, List
 from openai import OpenAI
 from dotenv import load_dotenv
 
+from llm_fallback import resolve_llm
+
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
+
+def _client_and_model():
+    """Build an OpenAI-compatible client + model, with OpenRouter fallback.
+
+    Uses OPENAI_API_KEY directly when present; otherwise routes through
+    OPENROUTER_API_KEY. Raises RuntimeError (listing accepted keys) when neither
+    is configured, so callers can surface a clear error.
+    """
+    api_key, base_url, model = resolve_llm()
+    client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+    return client, model
 
 
 async def generate_python_code(
@@ -32,11 +46,10 @@ async def generate_python_code(
         Dictionary with generated code
     """
     try:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            return {"success": False, "error": "OPENAI_API_KEY not configured"}
-        
-        client = OpenAI(api_key=api_key)
+        try:
+            client, model = _client_and_model()
+        except RuntimeError as e:
+            return {"success": False, "error": str(e)}
         
         prompt = f"""Generate Python code for the following task:
 
@@ -47,7 +60,7 @@ Task: {task_description}
 Provide clean, well-documented Python code that solves the task."""
         
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             messages=[
                 {"role": "system", "content": "You are an expert Python programmer. Generate clean, efficient code."},
                 {"role": "user", "content": prompt}
@@ -62,7 +75,7 @@ Provide clean, well-documented Python code that solves the task."""
             "success": True,
             "task": task_description,
             "code": code,
-            "model": "gpt-4o-mini",
+            "model": model,
             "tokens_used": response.usage.total_tokens
         }
         
@@ -87,11 +100,10 @@ async def complex_problem_reasoning(
         Dictionary with reasoning process and conclusion
     """
     try:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            return {"success": False, "error": "OPENAI_API_KEY not configured"}
-        
-        client = OpenAI(api_key=api_key)
+        try:
+            client, model = _client_and_model()
+        except RuntimeError as e:
+            return {"success": False, "error": str(e)}
         
         prompt = f"""Analyze the following problem with step-by-step reasoning:
 
@@ -102,7 +114,7 @@ Problem: {problem}
 Think through this problem step by step. Provide {reasoning_steps} clear reasoning steps, then give your conclusion."""
         
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             messages=[
                 {"role": "system", "content": "You are an expert problem solver. Think step by step."},
                 {"role": "user", "content": prompt}
@@ -117,7 +129,7 @@ Think through this problem step by step. Provide {reasoning_steps} clear reasoni
             "success": True,
             "problem": problem,
             "reasoning": reasoning,
-            "model": "gpt-4o-mini",
+            "model": model,
             "tokens_used": response.usage.total_tokens
         }
         
@@ -142,11 +154,10 @@ async def guard_reasoning_process(
         Dictionary with safety evaluation
     """
     try:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            return {"success": False, "error": "OPENAI_API_KEY not configured"}
-        
-        client = OpenAI(api_key=api_key)
+        try:
+            client, model = _client_and_model()
+        except RuntimeError as e:
+            return {"success": False, "error": str(e)}
         
         rules_text = "\n".join(f"- {rule}" for rule in (safety_rules or []))
         safety_rules_block = f"Safety Rules to Check:\n{rules_text}" if safety_rules else ""
@@ -171,7 +182,7 @@ Provide:
 - suggestions: Alternative approaches if not approved"""
         
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             messages=[
                 {"role": "system", "content": "You are a safety validator. Carefully evaluate proposed actions."},
                 {"role": "user", "content": prompt}
@@ -190,7 +201,7 @@ Provide:
             "proposed_action": proposed_action,
             "approved": approved,
             "evaluation": evaluation,
-            "model": "gpt-4o-mini"
+            "model": model
         }
         
     except Exception as e:

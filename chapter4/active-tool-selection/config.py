@@ -9,6 +9,32 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
+
+def _map_model_for_openrouter(model: str) -> str:
+    """Map a plain model id onto OpenRouter's `provider/model` form.
+
+    Ids that already contain "/" pass through unchanged; gpt-*/o1-*/o3-*/o4-*
+    become openai/…; claude-* becomes anthropic/claude-opus-4.8.
+    """
+    if "/" in model:
+        return model
+    m = model.lower()
+    if m.startswith(("gpt-", "o1-", "o3-", "o4-")):
+        return f"openai/{model}"
+    if m.startswith("claude-"):
+        return "anthropic/claude-opus-4.8"
+    return model
+
+
+# Universal fallback: when no direct OPENAI_API_KEY is configured but an
+# OPENROUTER_API_KEY is present, route through OpenRouter automatically so the
+# agent still runs. Explicit OPENAI_BASE_URL / OPENAI_MODEL overrides are kept.
+if not OPENAI_API_KEY and os.getenv("OPENROUTER_API_KEY"):
+    OPENAI_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    if not os.getenv("OPENAI_BASE_URL"):
+        OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
+    OPENAI_MODEL = _map_model_for_openrouter(OPENAI_MODEL)
+
 # Agent Configuration
 AGENT_TEMPERATURE = 0.7
 MAX_TOOL_REQUESTS = 5  # Maximum number of tool discovery iterations

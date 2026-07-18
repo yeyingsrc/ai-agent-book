@@ -10,28 +10,23 @@ import subprocess
 import signal
 from event_types import EventType
 
-# Check if API key is set (matching conversational_agent.py)
+# Check if API key is set (universal OpenRouter fallback applied by the server).
+from agent import resolve_provider_and_key
+
 provider = os.getenv("LLM_PROVIDER", "kimi").lower()
+resolved_provider, api_key = resolve_provider_and_key(provider)
 
-if provider == "siliconflow":
-    api_key_var = "SILICONFLOW_API_KEY"
-elif provider == "doubao":
-    api_key_var = "DOUBAO_API_KEY"
-elif provider in ["kimi", "moonshot"]:
-    api_key_var = "KIMI_API_KEY"
-elif provider == "openrouter":
-    api_key_var = "OPENROUTER_API_KEY"
-else:
-    print(f"❌ Error: Unsupported provider: {provider}")
-    sys.exit(1)
-
-if not os.getenv(api_key_var):
-    print(f"❌ Error: {api_key_var} environment variable not set")
-    print(f"\nPlease set it first:")
-    print(f"  export {api_key_var}='your-api-key-here'")
+if not api_key:
+    print(f"❌ Error: no API key for provider '{provider}', and no OPENROUTER_API_KEY fallback")
+    print(f"\nPlease set one of:")
+    print(f"  export KIMI_API_KEY='...'         # or SILICONFLOW/DOUBAO/OPENROUTER per provider")
+    print(f"  export OPENROUTER_API_KEY='...'   # universal fallback")
     print(f"\nOr change provider:")
     print(f"  export LLM_PROVIDER=kimi  # or siliconflow, doubao, openrouter")
     sys.exit(1)
+
+if resolved_provider != provider:
+    print(f"ℹ️  provider '{provider}' has no key; the server will fall back to OpenRouter.")
 
 print("\n" + "="*80)
 print("🚀 EVENT-TRIGGERED AGENT QUICK START")

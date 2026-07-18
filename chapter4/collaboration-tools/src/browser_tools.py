@@ -161,23 +161,25 @@ async def browser_execute_task(task: str, max_steps: int = 20) -> Dict[str, Any]
         from browser_use import Agent
         from langchain_openai import ChatOpenAI
         import os
-        
+
+        from llm_fallback import resolve_llm
+
         browser = await init_browser()
-        
-        # Create LLM
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
+
+        # Create LLM (direct OpenAI, or OpenRouter fallback when only that key is set)
+        try:
+            api_key, base_url, model = resolve_llm()
+        except RuntimeError as e:
             return {
                 "success": False,
-                "error": "OPENAI_API_KEY not configured",
+                "error": str(e),
                 "message": "Cannot execute autonomous tasks without LLM configuration"
             }
-        
-        llm = ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            api_key=api_key,
-            temperature=0.7,
-        )
+
+        llm_kwargs = {"model": model, "api_key": api_key, "temperature": 0.7}
+        if base_url:
+            llm_kwargs["base_url"] = base_url
+        llm = ChatOpenAI(**llm_kwargs)
         
         # Create and run agent
         agent = Agent(

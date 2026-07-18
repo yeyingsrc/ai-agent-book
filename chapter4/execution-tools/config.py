@@ -66,25 +66,44 @@ class Config:
         return None
     
     @classmethod
+    def effective_provider(cls) -> str:
+        """Resolve the provider actually used, applying the OpenRouter fallback.
+
+        Preserves default behavior when the configured provider's key is
+        present. Otherwise, if an OPENROUTER_API_KEY is available, transparently
+        fall back to 'openrouter' so the tools still run with only that key set.
+        """
+        provider = cls.PROVIDER.lower()
+        if cls.get_api_key(provider):
+            return provider
+        if cls.OPENROUTER_API_KEY:
+            return "openrouter"
+        return provider
+
+    @classmethod
     def validate(cls) -> None:
         """Validate the configuration."""
-        provider = cls.PROVIDER.lower()
+        provider = cls.effective_provider()
         api_key = cls.get_api_key(provider)
-        
+
         if not api_key:
             raise ValueError(
-                f"API key required for provider '{provider}'. "
-                f"Set {provider.upper()}_API_KEY environment variable."
+                f"API key required for provider '{cls.PROVIDER.lower()}'. "
+                f"Set one of {cls.PROVIDER.upper()}_API_KEY or OPENROUTER_API_KEY "
+                f"(universal fallback)."
             )
-    
+
     @classmethod
     def get_llm_config(cls) -> dict:
         """Get LLM configuration based on provider."""
-        provider = cls.PROVIDER.lower()
+        provider = cls.effective_provider()
         api_key = cls.get_api_key(provider)
-        
+
         if not api_key:
-            raise ValueError(f"API key not found for provider: {provider}")
+            raise ValueError(
+                f"API key not found for provider '{cls.PROVIDER.lower()}'. "
+                f"Set {cls.PROVIDER.upper()}_API_KEY or OPENROUTER_API_KEY."
+            )
         
         if provider == "siliconflow":
             return {

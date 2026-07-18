@@ -36,6 +36,36 @@ def _reasoning_safe_temperature(model, requested=1.0):
     return 1 if ("kimi-k3" in m or "gpt-5" in m) else requested
 
 
+# Per-provider env var holding that provider's API key.
+_PROVIDER_KEY_ENV = {
+    "siliconflow": "SILICONFLOW_API_KEY",
+    "doubao": "DOUBAO_API_KEY",
+    "kimi": "KIMI_API_KEY",
+    "moonshot": "KIMI_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+}
+
+
+def resolve_provider_and_key(provider: Optional[str] = None):
+    """Resolve (provider, api_key) applying a universal OpenRouter fallback.
+
+    Preferred provider (default from LLM_PROVIDER, else 'kimi') is used as today
+    when its own key is present. Otherwise, if OPENROUTER_API_KEY is set, fall
+    back to the already-supported 'openrouter' provider so the agent still runs.
+    Returns (provider, None) when no usable key is found, leaving the caller to
+    emit its own error.
+    """
+    provider = (provider or os.getenv("LLM_PROVIDER", "kimi")).lower()
+    key_env = _PROVIDER_KEY_ENV.get(provider)
+    api_key = os.getenv(key_env) if key_env else None
+    if api_key:
+        return provider, api_key
+    or_key = os.getenv("OPENROUTER_API_KEY")
+    if or_key:
+        return "openrouter", or_key
+    return provider, None
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

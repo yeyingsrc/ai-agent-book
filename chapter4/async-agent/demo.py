@@ -48,10 +48,32 @@ def _completion_params_for(model: str) -> dict:
     return {"temperature": 0.2}
 
 
+def _map_model_for_openrouter(model: str) -> str:
+    """把常见模型名映射成 OpenRouter 的 `provider/model` 形式。
+
+    - 已含 "/" 的 id（如 anthropic/claude-opus-4.8、google/gemini-2.5-pro）原样透传。
+    - gpt-*/o1-*/o3-*/o4-* -> openai/…
+    - claude-* -> anthropic/claude-opus-4.8
+    - 其它保持原样（交给 OpenRouter 校验）。
+    """
+    if "/" in model:
+        return model
+    m = model.lower()
+    if m.startswith(("gpt-", "o1-", "o3-", "o4-")):
+        return f"openai/{model}"
+    if m.startswith("claude-"):
+        return "anthropic/claude-opus-4.8"
+    return model
+
+
 def make_client():
     """按 LLM_PROVIDER 选择可用的模型服务（默认 openai）。
 
     返回 (client, model, completion_params)。
+
+    通用兜底：当直连 provider 的 key 缺失、但存在 OPENROUTER_API_KEY 时，
+    自动改走 OpenRouter（api_key=OPENROUTER_API_KEY，base_url=openrouter.ai/api/v1，
+    并把模型名映射成 provider/model 形式），从而"有 OpenRouter key 就能跑"。
     """
     from openai import AsyncOpenAI  # 惰性导入：离线演示无需安装 openai
     provider = os.getenv("LLM_PROVIDER", "openai").lower()
@@ -68,13 +90,28 @@ def make_client():
             raise SystemExit("使用 ARK 时请设置 LLM_MODEL 为你的推理接入点 ID")
         client = AsyncOpenAI(api_key=key, base_url="https://ark.cn-beijing.volces.com/api/v3")
         return client, model, _completion_params_for(model)
+    if provider == "openrouter":
+        key = os.environ["OPENROUTER_API_KEY"]
+        model = _map_model_for_openrouter(os.getenv("LLM_MODEL", "openai/gpt-4o-mini"))
+        client = AsyncOpenAI(api_key=key, base_url="https://openrouter.ai/api/v1")
+        return client, model, _completion_params_for(model)
     key = os.getenv("OPENAI_API_KEY")
-    if not key:
-        raise SystemExit("未找到 OPENAI_API_KEY，请配置后重试（或设置 LLM_PROVIDER=moonshot/ark）。")
-    model = os.getenv("LLM_MODEL", "gpt-4o-mini")
-    base = os.getenv("OPENAI_BASE_URL")
-    client = AsyncOpenAI(api_key=key, base_url=base) if base else AsyncOpenAI(api_key=key)
-    return client, model, _completion_params_for(model)
+    if key:
+        model = os.getenv("LLM_MODEL", "gpt-4o-mini")
+        base = os.getenv("OPENAI_BASE_URL")
+        client = AsyncOpenAI(api_key=key, base_url=base) if base else AsyncOpenAI(api_key=key)
+        return client, model, _completion_params_for(model)
+    # 直连 OPENAI_API_KEY 缺失时的通用兜底：若有 OPENROUTER_API_KEY 则改走 OpenRouter。
+    or_key = os.getenv("OPENROUTER_API_KEY")
+    if or_key:
+        model = _map_model_for_openrouter(os.getenv("LLM_MODEL", "openai/gpt-4o-mini"))
+        client = AsyncOpenAI(api_key=or_key, base_url="https://openrouter.ai/api/v1")
+        return client, model, _completion_params_for(model)
+    raise SystemExit(
+        "未找到可用的 LLM Key。请设置以下任意一项："
+        "OPENAI_API_KEY 或 OPENROUTER_API_KEY（或 LLM_PROVIDER=moonshot 且 MOONSHOT_API_KEY / "
+        "LLM_PROVIDER=ark 且 ARK_API_KEY）。"
+    )
 
 
 async def run_runtime(rt: AgentRuntime):

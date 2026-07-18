@@ -33,6 +33,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from openai import OpenAI
 
+from llm_fallback import has_llm, resolve_llm
+
 logger = logging.getLogger(__name__)
 
 # In-memory registry of sub-agents (mirrors the pattern used by hitl_tools /
@@ -43,27 +45,28 @@ _async_tasks: Dict[str, "asyncio.Task"] = {}
 
 # Default model + client tuning. Kept consistent with intelligence_tools.py
 # (gpt-4o-mini) but overridable via env, with timeout + retries on the client.
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+# When only OPENROUTER_API_KEY is set, resolve_llm() maps the model id to
+# provider/model form (e.g. gpt-4o-mini -> openai/gpt-4o-mini).
+DEFAULT_MODEL = (
+    resolve_llm()[2] if has_llm() else os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+)
 _CLIENT_TIMEOUT = float(os.getenv("OPENAI_TIMEOUT", "60"))
 _CLIENT_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "2"))
 
 
 def _offline() -> bool:
-    """离线模式：未配置 OPENAI_API_KEY 时启用确定性模拟，便于无密钥演示。"""
-    return not os.getenv("OPENAI_API_KEY")
+    """离线模式：既无 OPENAI_API_KEY 也无 OPENROUTER_API_KEY 时启用确定性模拟。"""
+    return not has_llm()
 
 
 def _get_client() -> OpenAI:
-    """Build an OpenAI client with timeout + retries and no hardcoded secrets."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not configured")
+    """Build an OpenAI-compatible client (direct OpenAI, or OpenRouter fallback)."""
+    api_key, base_url, _ = resolve_llm()
     kwargs: Dict[str, Any] = {
         "api_key": api_key,
         "timeout": _CLIENT_TIMEOUT,
         "max_retries": _CLIENT_MAX_RETRIES,
     }
-    base_url = os.getenv("OPENAI_BASE_URL")
     if base_url:
         kwargs["base_url"] = base_url
     return OpenAI(**kwargs)

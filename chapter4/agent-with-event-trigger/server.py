@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from agent import EventTriggeredAgent, SystemHintConfig
+from agent import EventTriggeredAgent, SystemHintConfig, resolve_provider_and_key
 from event_types import Event, EventType
 import threading
 import time
@@ -108,26 +108,25 @@ async def init_agent():
     """Initialize the agent with optional MCP tools"""
     global agent, mcp_loading_status
     
-    # Determine provider from environment
-    provider = os.getenv("LLM_PROVIDER", "kimi").lower()
-    
-    # Get API key based on provider
-    if provider == "siliconflow":
-        api_key = os.getenv("SILICONFLOW_API_KEY")
-    elif provider == "doubao":
-        api_key = os.getenv("DOUBAO_API_KEY")
-    elif provider in ["kimi", "moonshot"]:
-        api_key = os.getenv("KIMI_API_KEY")
-    elif provider == "openrouter":
-        api_key = os.getenv("OPENROUTER_API_KEY")
-    else:
-        raise ValueError(f"Unsupported provider: {provider}")
-    
+    # Determine provider from environment (universal OpenRouter fallback applied)
+    requested_provider = os.getenv("LLM_PROVIDER", "kimi").lower()
+    provider, api_key = resolve_provider_and_key(requested_provider)
+
     if not api_key:
-        raise ValueError(f"API key not set for provider '{provider}'. Set the appropriate environment variable.")
-    
+        raise ValueError(
+            f"API key not set for provider '{requested_provider}'. Set the appropriate "
+            f"environment variable, or set OPENROUTER_API_KEY as a universal fallback."
+        )
+
     # Get model from environment if specified
     model = os.getenv("LLM_MODEL")
+    if provider != requested_provider:
+        logger.info(
+            f"ℹ️ provider '{requested_provider}' has no key; falling back to OpenRouter."
+        )
+        # Keep an explicit provider/model id; otherwise use OpenRouter's default.
+        if not (model and "/" in model):
+            model = None
     
     # Check if MCP should be enabled (default: true)
     enable_mcp = os.getenv("ENABLE_MCP_TOOLS", "true").lower() not in ["false", "0", "no"]

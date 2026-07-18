@@ -121,6 +121,12 @@ LLM_PROVIDER=moonshot python demo.py scenarios --scenario 1
 LLM_PROVIDER=ark LLM_MODEL=ep-xxxx python demo.py scenarios --scenario 1
 ```
 
+> **OpenRouter 通用兜底**：未配置 `OPENAI_API_KEY`（且未用 moonshot/ark provider）时，
+> 只要设置了 `OPENROUTER_API_KEY`，`demo.py` 会自动改走 OpenRouter，并把模型名映射为
+> `provider/model` 形式（`gpt-*` → `openai/…`、`claude-*` → `anthropic/claude-opus-4.8`、
+> 含 `/` 的原样透传）。也可显式 `LLM_PROVIDER=openrouter`。例如：
+> `OPENROUTER_API_KEY=sk-or-xxx LLM_MODEL=openai/gpt-4o-mini python demo.py scenarios --scenario 1`
+
 > Moonshot 默认走**推理模型 `kimi-k3`**（旧的 `kimi-k2-*-preview` 与 `moonshot-v1-*` 已过时/停用）。
 > 推理模型要求 `temperature=1` 且 `max_tokens>=2048`，`demo.py` 会按模型自动套用这套采样参数，无需手动配置。
 
