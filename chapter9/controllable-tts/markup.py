@@ -9,7 +9,7 @@
 支持两类标记：
 
 1) 状态标记（持续生效，直到被下一个同类标记改变）
-   [EMO:neutral|happy|excited|frustrated|thinking]   或  [情感=中性|高兴|兴奋|沮丧|思考]
+   [EMO:neutral|happy|frustrated|thinking]           或  [情感=中性|高兴|沮丧|思考]
    [SPEED:normal|fast|slow] / [SPEED:0.8x]           或  [语速=正常|快|慢]
    [STYLE:formal|casual]                             或  [风格=正式|轻松]
 
@@ -30,7 +30,7 @@ import re
 
 # 中文取值 -> 英文维度值的别名映射
 _EMO_ALIAS = {
-    "中性": "neutral", "高兴": "happy", "开心": "happy", "兴奋": "excited",
+    "中性": "neutral", "高兴": "happy", "开心": "happy", "兴奋": "happy",
     "沮丧": "frustrated", "无奈": "frustrated", "思考": "thinking",
 }
 _SPEED_ALIAS = {"正常": "normal", "快": "fast", "快速": "fast", "慢": "slow", "慢速": "slow"}
@@ -185,3 +185,38 @@ def parse(text: str, trace: list | None = None):
 
     flush()
     return segments
+
+
+# ---------------------------------------------------------------------------
+# 控制标记 -> 动作 的静态映射表（离线可查，供 demo.py --dump-mapping 打印）
+# 这是「书中控制标记 -> 参考语音 / 非语言音」映射关系的单一事实来源。
+# ---------------------------------------------------------------------------
+
+# (类别, 标记写法, 中文写法, 映射到的动作)
+MARKER_REFERENCE = [
+    ("状态", "[EMO:neutral|happy|frustrated|thinking]", "[情感=中性|高兴|沮丧|思考]",
+     "切换情绪维度，选择参考语音"),
+    ("状态", "[SPEED:normal|fast|slow] / [SPEED:0.8x]", "[语速=正常|快|慢]",
+     "切换语速维度（数字型就近映射到 fast/slow/normal）"),
+    ("状态", "[STYLE:formal|casual]", "[风格=正式|轻松]", "切换口吻维度"),
+    ("内联", "[THINKING]", "—", "切到「思考/慢速/正式」参考语音 + 插入 500ms 停顿"),
+    ("内联", "[SEARCHING]", "—", "切到「思考/慢速/正式」参考语音 + 插入 400ms 停顿"),
+    ("内联", "[PAUSE] / <pause>", "[停顿]", "插入 500ms 静音"),
+    ("内联", "[BREATH] / <breath>", "[换气]", "插入 400ms 换气停顿"),
+    ("内联", "[SIGH] / <sigh>", "—", "叹气拟声词「唉——」(沮丧音色) + 300ms 停顿"),
+    ("内联", "[LAUGH:small] / [LAUGH] / <laugh>", "—", "轻笑拟声词「哈哈，」(高兴音色)"),
+    ("内联", "<emphasis>…</emphasis>", "[强调]…[/强调]", "对包裹文本追加「加重强调」提示词"),
+]
+
+
+def format_marker_reference() -> str:
+    """把 MARKER_REFERENCE 渲染成可打印的对齐表格字符串。"""
+    lines = [f"{'类别':<4} {'标记写法':<40} {'中文写法':<24} 动作", "-" * 100]
+    for cat, mark, zh, action in MARKER_REFERENCE:
+        lines.append(f"{cat:<4} {mark:<40} {zh:<24} {action}")
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    print("控制标记 -> 动作 映射表：\n")
+    print(format_marker_reference())

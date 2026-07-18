@@ -20,6 +20,7 @@ pine_voice —— PineClaw Voice API 的本地【模拟】客户端。
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -79,9 +80,13 @@ class CallRecord:
 # --------------------------------------------------------------------------- #
 # 内部：调用 OpenAI 生成一次发言
 # --------------------------------------------------------------------------- #
-def _chat(messages: list[dict[str, str]], temperature: float = 0.7) -> str:
+def _chat(
+    messages: list[dict[str, str]],
+    temperature: float = 0.7,
+    model: str | None = None,
+) -> str:
     resp = _get_client().chat.completions.create(
-        model=_MODEL,
+        model=model or _MODEL,
         messages=messages,
         temperature=temperature,
     )
@@ -125,7 +130,9 @@ def _caller_system_prompt(phone_number: str, goal: str, context: str) -> str:
     )
 
 
-def _run_dialog(phone_number: str, goal: str, context: str) -> list[dict[str, str]]:
+def _run_dialog(
+    phone_number: str, goal: str, context: str, model: str | None = None
+) -> list[dict[str, str]]:
     """驱动两个 LLM 角色来回对话，产出逐轮 transcript。"""
     caller_sys = _caller_system_prompt(phone_number, goal, context)
     callee_sys = _callee_system_prompt(goal, context)
@@ -138,14 +145,14 @@ def _run_dialog(phone_number: str, goal: str, context: str) -> list[dict[str, st
 
     # 被叫方先开口（IVR 欢迎语 + 菜单）。
     callee_msgs.append({"role": "user", "content": "（电话已接通，请开始。）"})
-    callee_line = _chat(callee_msgs)
+    callee_line = _chat(callee_msgs, model=model)
     callee_msgs.append({"role": "assistant", "content": callee_line})
     caller_msgs.append({"role": "user", "content": callee_line})
     transcript.append({"speaker": "被叫方", "text": callee_line})
 
     for _ in range(_MAX_TURNS):
         # 去电语音 Agent 发言
-        caller_line = _chat(caller_msgs)
+        caller_line = _chat(caller_msgs, model=model)
         ended = _END_TOKEN in caller_line
         caller_line_clean = caller_line.replace(_END_TOKEN, "").strip()
         caller_msgs.append({"role": "assistant", "content": caller_line})
@@ -155,7 +162,7 @@ def _run_dialog(phone_number: str, goal: str, context: str) -> list[dict[str, st
             break
 
         # 被叫方回应
-        callee_line = _chat(callee_msgs)
+        callee_line = _chat(callee_msgs, model=model)
         callee_msgs.append({"role": "assistant", "content": callee_line})
         caller_msgs.append({"role": "user", "content": callee_line})
         transcript.append({"speaker": "被叫方", "text": callee_line})
@@ -163,7 +170,9 @@ def _run_dialog(phone_number: str, goal: str, context: str) -> list[dict[str, st
     return transcript
 
 
-def _extract_structured(goal: str, transcript: list[dict[str, str]]) -> dict[str, Any]:
+def _extract_structured(
+    goal: str, transcript: list[dict[str, str]], model: str | None = None
+) -> dict[str, Any]:
     """通话结束后，用一次 LLM 调用把 transcript 归纳为结构化字段。"""
     dialog_text = "\n".join(f"{t['speaker']}：{t['text']}" for t in transcript)
     prompt = (
@@ -184,6 +193,7 @@ def _extract_structured(goal: str, transcript: list[dict[str, str]]) -> dict[str
             {"role": "user", "content": prompt},
         ],
         temperature=0.0,
+        model=model,
     )
     return _safe_json(raw)
 
@@ -212,9 +222,55 @@ def _safe_json(raw: str) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# 离线 dry-run —— 完全不联网、不需要任何 API Key 的脚本化通话记录
+# --------------------------------------------------------------------------- #
+def _dryrun_record(phone_number: str, goal: str, context: str) -> dict[str, Any]:
+    """
+    返回一份【脚本化】的结构化通话记录，全程不调用任何 API、不联网。
+
+    用途：当既没有电话账号、也没有 OPENAI_API_KEY 时，仍能把整条 ReAct 循环
+    （思考 → 调用 make_phone_call → 读取结构化记录 → 汇报）离线跑通，展示其形状。
+    transcript / key_fields 均为固定脚本，不代表任何真实通话。
+    """
+    ctx = context or "（无额外上下文）"
+    # 由 goal 派生一个稳定、可复现的确认号（而非随机编造，便于对齐说明）。
+    conf = "PC" + hashlib.sha1(goal.encode("utf-8")).hexdigest()[:8].upper()
+    transcript = [
+        {"speaker": "被叫方", "text": "您好，欢迎致电客服热线。业务查询请按 1，人工服务请按 0。"},
+        {"speaker": "语音Agent", "text": "我按 0 转人工。"},
+        {"speaker": "被叫方", "text": "您好，人工客服工号 3021，请问有什么可以帮您？"},
+        {"speaker": "语音Agent", "text": f"你好，我这边的诉求是：{goal}。相关信息：{ctx}。"},
+        {"speaker": "被叫方",
+         "text": f"好的，已为您核实并受理，给您一个确认号 {conf}，后续可凭此查询进度。"},
+        {"speaker": "语音Agent", "text": f"好的，确认号 {conf}，我记下了，谢谢，再见。"},
+    ]
+    record = CallRecord(
+        call_id="pc_dryrun_" + hashlib.sha1((phone_number + goal).encode()).hexdigest()[:8],
+        phone_number=phone_number,
+        goal=goal,
+        status="completed",
+        goal_achieved=True,
+        duration_seconds=12 * len(transcript) + 8,
+        summary=f"（dry-run 脚本模拟）已就“{goal}”联系 {phone_number} 并受理，确认号 {conf}。",
+        key_fields={"处理结果": "已受理", "确认号": conf, "对方号码": phone_number},
+        transcript=transcript,
+        follow_up_needed=False,
+        follow_up_reason="",
+    )
+    return record.to_dict()
+
+
+# --------------------------------------------------------------------------- #
 # 对外唯一入口 —— 对齐真实 PineClaw Voice API 的 make_phone_call
 # --------------------------------------------------------------------------- #
-def make_phone_call(phone_number: str, goal: str, context: str = "") -> dict[str, Any]:
+def make_phone_call(
+    phone_number: str,
+    goal: str,
+    context: str = "",
+    *,
+    model: str | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
     """
     发起一通（模拟的）电话，由语音 Agent 全程完成，返回结构化通话记录（dict）。
 
@@ -223,13 +279,18 @@ def make_phone_call(phone_number: str, goal: str, context: str = "") -> dict[str
         goal:         本次通话要达成的目标，例如
                       "查询本月宽带账单为何多扣了 50 元并要求解释"。
         context:      辅助上下文，如账号、姓名、已知信息等（可为空）。
+        model:        覆盖内部模拟对话所用的 OpenAI 模型（默认取 OPENAI_MODEL）。
+        dry_run:      若为真，则走完全离线的脚本化路径（不联网、不需要任何 API Key）。
 
     返回：
         CallRecord.to_dict()，包含 transcript / goal_achieved / key_fields 等。
     """
+    if dry_run:
+        return _dryrun_record(phone_number, goal, context)
+
     started = time.time()
-    transcript = _run_dialog(phone_number, goal, context)
-    structured = _extract_structured(goal, transcript)
+    transcript = _run_dialog(phone_number, goal, context, model=model)
+    structured = _extract_structured(goal, transcript, model=model)
 
     # 用对话轮数粗略折算一个「通话时长」，纯属演示展示用。
     duration = 12 * len(transcript) + 8

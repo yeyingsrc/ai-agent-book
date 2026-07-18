@@ -88,16 +88,38 @@ cp env.example .env
 
 python demo.py
 python demo.py --task "帮我打电话给餐厅订今晚 7 点 4 人的位子"   # 自定义电话任务
+python demo.py --dry-run                                       # 离线跑通，无需任何 API Key
 python demo.py --help                                          # 查看全部参数
 ```
 
-`demo.py` 会真实调用 OpenAI，打印三段内容：
+命令行参数（`python demo.py --help` 有中文说明）：
+
+| 参数 | 作用 |
+| --- | --- |
+| `--task` | 自定义电话任务（自然语言）。默认用书中的宽带账单示例 |
+| `--phone` | 可选：对方电话号码。作为已知信息交给 Agent（dry-run 下直接用作被叫号码） |
+| `--goal` | 可选：明确的通话目标。作为已知信息交给 Agent（dry-run 下直接用作通话目标） |
+| `--model` | 可选：覆盖模型（默认取 `OPENAI_MODEL`，即 `gpt-4o-mini`） |
+| `--dry-run` | **离线脚本模式**：不联网、不需要任何 API Key，仅演示 ReAct 循环与数据契约的形状 |
+
+`demo.py` 会真实调用 OpenAI（除非加 `--dry-run`），打印三段内容：
 (a) ReAct Agent 的轨迹（思考 + 发起 `make_phone_call`）；
 (b) 返回的结构化通话记录（多轮 transcript + 是否达成目标 + 关键字段）；
 (c) Agent 基于通话结果向用户的最终汇报。
 
 > 只使用 `OPENAI_API_KEY`（可选 `OPENAI_BASE_URL` 指向兼容网关，如 Moonshot / 火山方舟）。
 > 请勿使用 OPENROUTER / ANTHROPIC / DEEPSEEK / SILICONFLOW。
+
+### 两级「模拟」的区别
+
+本实验里有两层各自独立的模拟，别混淆：
+
+- **默认（mock）**：`pine_voice.py` 替换掉真实**电话网络**，但 ReAct Agent 与被叫方对话
+  仍由 **OpenAI 实时生成**——所以需要 `OPENAI_API_KEY`，每次对话/字段都不同。
+- **`--dry-run`（离线脚本）**：连 LLM 也不调用，`make_phone_call` 直接返回一份**固定脚本**的
+  结构化通话记录。用于在**没有任何 API Key、完全离线**时也能把整条 ReAct 循环
+  （思考 → 调用工具 → 读结构化记录 → 汇报）跑通、看清其形状。脚本里的确认号由目标哈希派生，
+  可复现，**不代表任何真实通话**。
 
 ## 预期输出示例（真实节选）
 

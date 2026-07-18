@@ -67,17 +67,31 @@ def parse_args() -> argparse.Namespace:
         description="实验 9-2：把 PineClaw Voice（make_phone_call）当工具的 ReAct 电话 Agent。"
                     "给一个自然语言电话任务，Agent 自行决定号码/目标/上下文并（模拟）拨打，"
                     "读取结构化通话记录后向用户汇报。",
+        epilog="示例：\n"
+               "  python demo.py                       # 书中默认的宽带账单任务（需 OPENAI_API_KEY）\n"
+               "  python demo.py --dry-run             # 完全离线：脚本化 ReAct 轨迹，无需任何 API Key\n"
+               "  python demo.py --task \"帮我打电话给餐厅订今晚 7 点 4 人的位子\" --phone 021-8888\n"
+               "  python demo.py --model gpt-4o        # 覆盖模型",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("--task", default=_DEFAULT_TASK,
                    help="自定义电话任务（自然语言）。默认用书中的宽带账单示例。")
+    p.add_argument("--phone", default=None, metavar="号码",
+                   help="可选：对方电话号码。给定时作为已知信息交给 Agent（dry-run 下直接用作被叫号码）。")
+    p.add_argument("--goal", default=None, metavar="目标",
+                   help="可选：明确的通话目标。给定时作为已知信息交给 Agent（dry-run 下直接用作通话目标）。")
+    p.add_argument("--model", default=None, metavar="模型",
+                   help="可选：覆盖使用的模型（默认取环境变量 OPENAI_MODEL，即 gpt-4o-mini）。")
+    p.add_argument("--dry-run", action="store_true",
+                   help="离线脚本模式：不联网、不需要任何 API Key，仅演示 ReAct 循环与数据契约的形状。")
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    if not os.getenv("OPENAI_API_KEY"):
-        print("错误：未检测到 OPENAI_API_KEY。请复制 env.example 为 .env 并填入有效 key。")
+    if not args.dry_run and not os.getenv("OPENAI_API_KEY"):
+        print("错误：未检测到 OPENAI_API_KEY。请复制 env.example 为 .env 并填入有效 key，"
+              "或改用 python demo.py --dry-run 走完全离线的脚本演示。")
         sys.exit(1)
 
     # 书中示例任务：注意这里只给了自然语言任务，Agent 需自行决定通话参数。
@@ -85,6 +99,9 @@ def main() -> None:
 
     _hr("用户任务")
     print(task)
+    if args.dry_run:
+        print("\n[模式] dry-run 离线脚本模拟：以下轨迹与通话记录均为固定脚本，"
+              "不调用任何 LLM/电话 API，仅用于演示 ReAct 循环的形状。")
 
     _hr("ReAct Agent 轨迹")
 
@@ -102,7 +119,14 @@ def main() -> None:
         elif kind == "final":
             pass  # 最终汇报单独打印
 
-    final = run_agent(task, on_event=on_event)
+    final = run_agent(
+        task,
+        on_event=on_event,
+        model=args.model,
+        phone_hint=args.phone,
+        goal_hint=args.goal,
+        dry_run=args.dry_run,
+    )
 
     _hr("Agent 向用户的最终汇报")
     print(final)

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any, Callable
 
 from openai import OpenAI
@@ -91,15 +92,27 @@ _TOOLS = [
 ]
 
 
-def run_agent(task: str, on_event: Callable[[str, Any], None] | None = None) -> str:
+def run_agent(
+    task: str,
+    on_event: Callable[[str, Any], None] | None = None,
+    *,
+    model: str | None = None,
+    phone_hint: str | None = None,
+    goal_hint: str | None = None,
+    dry_run: bool = False,
+) -> str:
     """
     运行 ReAct 电话 Agent。
 
     参数：
-        task:     用户的自然语言任务。
-        on_event: 可选回调，用于外部观察 Agent 轨迹。
-                  事件类型：'think'(Agent 思考文本) / 'call'(工具入参) /
-                  'record'(结构化通话记录) / 'final'(最终汇报)。
+        task:       用户的自然语言任务。
+        on_event:   可选回调，用于外部观察 Agent 轨迹。
+                    事件类型：'think'(Agent 思考文本) / 'call'(工具入参) /
+                    'record'(结构化通话记录) / 'final'(最终汇报)。
+        model:      覆盖使用的模型（默认取环境变量 OPENAI_MODEL）。
+        phone_hint: 可选的电话号码；给定时作为已知信息交给 Agent（dry-run 下直接用作被叫号码）。
+        goal_hint:  可选的通话目标；给定时作为已知信息交给 Agent（dry-run 下直接用作通话目标）。
+        dry_run:    若为真，走完全离线的脚本化 ReAct 轨迹（不联网、不需要任何 API Key）。
 
     返回：
         Agent 面向用户的最终汇报文本。
@@ -109,14 +122,27 @@ def run_agent(task: str, on_event: Callable[[str, Any], None] | None = None) -> 
         if on_event:
             on_event(kind, payload)
 
+    if dry_run:
+        return _run_agent_dryrun(task, emit, phone_hint, goal_hint)
+
+    model = model or _MODEL
+
+    # 若显式给了号码/目标，就作为「已知信息」拼进用户消息，Agent 仍自行决定如何使用。
+    hints = []
+    if phone_hint:
+        hints.append(f"已知对方电话号码：{phone_hint}")
+    if goal_hint:
+        hints.append(f"用户明确的通话目标：{goal_hint}")
+    user_content = task if not hints else task + "\n\n（" + "；".join(hints) + "）"
+
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": _SYSTEM_PROMPT},
-        {"role": "user", "content": task},
+        {"role": "user", "content": user_content},
     ]
 
     for _ in range(_MAX_STEPS):
         resp = _get_client().chat.completions.create(
-            model=_MODEL,
+            model=model,
             messages=messages,
             tools=_TOOLS,
             tool_choice="auto",
@@ -147,6 +173,7 @@ def run_agent(task: str, on_event: Callable[[str, Any], None] | None = None) -> 
                     phone_number=args.get("phone_number", "10000"),
                     goal=args.get("goal", task),
                     context=args.get("context", ""),
+                    model=model,
                 )
                 emit("record", result)
 
@@ -167,8 +194,59 @@ def run_agent(task: str, on_event: Callable[[str, Any], None] | None = None) -> 
         }
     )
     resp = _get_client().chat.completions.create(
-        model=_MODEL, messages=messages, temperature=0.3
+        model=model, messages=messages, temperature=0.3
     )
     final = resp.choices[0].message.content or ""
+    emit("final", final)
+    return final
+
+
+def _guess_phone(task: str) -> str | None:
+    """从任务文本里粗略抽取一个像电话号码的数字串（>=4 位，避开『50 元』这类金额）。"""
+    for m in re.finditer(r"\d{4,}", task):
+        return m.group(0)
+    return None
+
+
+def _guess_context(task: str) -> str:
+    """从任务文本里粗略抽取账号等上下文（仅用于 dry-run 的启发式，不求完备）。"""
+    m = re.search(r"账[号户][^A-Za-z0-9]{0,3}([A-Za-z0-9][A-Za-z0-9\-]{2,})", task)
+    if m:
+        return f"账号 {m.group(1)}"
+    return ""
+
+
+def _run_agent_dryrun(
+    task: str,
+    emit: Callable[[str, Any], None],
+    phone_hint: str | None,
+    goal_hint: str | None,
+) -> str:
+    """
+    完全离线的脚本化 ReAct 轨迹：不调用任何 LLM/电话 API，仅演示循环的形状——
+    思考(推断参数) → 行动(make_phone_call, dry_run) → 观察(结构化记录) → 汇报。
+    """
+    phone = phone_hint or _guess_phone(task) or "10010"
+    goal = goal_hint or task
+    context = _guess_context(task)
+
+    emit(
+        "think",
+        "这是一个需要打电话才能完成的任务。我先确定通话三要素——"
+        f"号码={phone}；目标={goal}；上下文={context or '（无）'}。参数已足够，现在发起通话。",
+    )
+
+    call_args = {"phone_number": phone, "goal": goal, "context": context}
+    emit("call", call_args)
+    record = make_phone_call(**call_args, dry_run=True)
+    emit("record", record)
+
+    kf = record.get("key_fields", {}) or {}
+    kf_text = "；".join(f"{k}={v}" for k, v in kf.items()) or "（无）"
+    final = (
+        f"已（dry-run 脚本模拟）拨打 {phone} 并完成通话。\n"
+        f"结论：{record.get('summary', '')}\n"
+        f"关键信息：{kf_text}。"
+    )
     emit("final", final)
     return final

@@ -46,6 +46,51 @@ USER_QUESTION = (
     "请问他最后还剩多少钱？"
 )
 
+# 一句「答案取决于怎么说」的话：字面是顺从/无所谓，真实情绪要靠语气、语速、语调
+# 才能判断（是真的没意见，还是无奈、赌气）。这类副语言（Paralinguistic）任务正是
+# 端到端相对级联的分水岭——见 chapter9.md「文本代理思考」与 MGRD。
+PARALINGUISTIC_QUESTION = "行吧，那就这样吧，我没什么意见。"
+
+# 两类任务，对应书中两条对照轴：
+#   math          —— 语义任务：级联与端到端准确率相当（书 9.3「自级联」一节），主看延迟。
+#   paralinguistic—— 副语言任务：答案取决于「怎么说」。级联在 ASR 处把语音压成纯文本，
+#                    LLM 只能凭字面猜情绪（书中「文本代理思考」）；端到端直接听声学特征。
+TASKS: dict[str, dict] = {
+    "math": {
+        "question": USER_QUESTION,
+        "e2e_prompt": (
+            "你是一个中文语音助手。请先在内部完成必要的推理，再用简洁、口语化、"
+            "适合朗读的中文说出结论，控制在三句话以内。"
+        ),
+        "cascade_prompt": (
+            "你是一个语音助手。请先进行必要的推理，再给出简洁、口语化、"
+            "适合朗读的中文回答。回答控制在三句话以内。"
+        ),
+        "axis": (
+            "语义（Spoken-MQA 风格）：答案只取决于「说了什么」。级联与端到端准确率相当，"
+            "本任务主要对照【延迟】维度。"
+        ),
+    },
+    "paralinguistic": {
+        "question": PARALINGUISTIC_QUESTION,
+        "e2e_prompt": (
+            "你是一个中文语音助手。请先判断说话人的情绪、语速和语调（尽量依据声学特征"
+            "本身，而非仅凭字面意思），说出你听到的语气，再据此给出体贴、口语化、"
+            "适合朗读的中文回应，三句以内。"
+        ),
+        "cascade_prompt": (
+            "你是一个中文语音助手。请先判断说话人的情绪、语速和语调，说出你听到的语气，"
+            "再据此给出体贴、口语化、适合朗读的中文回应，三句以内。"
+        ),
+        "axis": (
+            "副语言（Paralinguistic）：答案取决于「怎么说」。级联的 LLM 只拿得到 ASR 纯"
+            "文本，任何情绪判断都是「文本代理思考」（凭字面猜）；端到端直接听声学特征。"
+            "本任务对照【信息损失】维度。注意：默认输入由 TTS 合成、情感偏平，差异被削弱；"
+            "用 --audio-input 喂一段真实带情绪的录音，对照会明显得多。"
+        ),
+    },
+}
+
 
 def hr(char: str = "-", n: int = 68) -> str:
     return char * n
@@ -103,7 +148,8 @@ def print_cascade_result(result: PipelineResult) -> None:
     print(f"\n级联总延迟（各阶段串行相加）：{result.total_latency_s:.2f}s")
 
 
-def print_comparison(e2e: PipelineResult, e2e_backend: str, cas: PipelineResult) -> None:
+def print_comparison(e2e: PipelineResult, e2e_backend: str, cas: PipelineResult,
+                     task: str) -> None:
     """打印端到端 vs 级联的真实对照（实测延迟）+ 范式概念差异 + 书中表 9-1（引用）。"""
     stages = {s.name: s for s in cas.stages}
     asr = stages["ASR 语音识别"]
@@ -111,8 +157,9 @@ def print_comparison(e2e: PipelineResult, e2e_backend: str, cas: PipelineResult)
     tts = stages["TTS 语音合成"]
 
     print("\n" + hr("="))
-    print("端到端 vs 级联：真实延迟对照")
+    print("端到端 vs 级联：真实对照")
     print(hr("="))
+    print(f"\n【任务】{task}：{TASKS[task]['axis']}")
     print("\n【1】实测总延迟（本次运行，随网络与负载波动）")
     print(f"    端到端（{e2e_backend}，单模型一次调用）：{e2e.total_latency_s:.2f}s")
     print(f"    级联  ASR({asr.latency_s:.2f}s) + LLM({llm.latency_s:.2f}s) "
@@ -129,6 +176,9 @@ def print_comparison(e2e: PipelineResult, e2e_backend: str, cas: PipelineResult)
     print(f"        ASR 文本 → 「{asr.text}」")
     print("    端到端模型在隐空间（Latent Space）中直接传递这些副语言信息，能感知")
     print("    情绪/语速/语调，并据此生成有表现力、韵律匹配的回复。")
+    print("    两条路对同一段音频的回答（可直观对比是否「听到了怎么说」）：")
+    print(f"        级联（只凭 ASR 文本，文本代理思考）→ 「{llm.text}」")
+    print(f"        端到端（直接听声学特征）        → 「{e2e.stages[0].text}」")
 
     print("\n【3】书中表 9-1：Step-Audio R1 不同语音思考配置（引自 Step-Audio R1 论文，"
           "非本 demo 产出）")
@@ -150,21 +200,50 @@ def print_comparison(e2e: PipelineResult, e2e_backend: str, cas: PipelineResult)
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="实验 9-4：端到端语音思考 vs 级联流水线。合成一段「用户提问」语音，"
-                    "同题跑通端到端（gpt-audio，可切 Step-Audio R1）与级联"
-                    "（whisper-1 → gpt-4o-mini → tts-1），打印真实延迟对照。",
+        prog="demo.py",
+        description="实验 9-4：端到端语音思考 vs 级联流水线。合成（或读取）一段「用户"
+                    "提问」语音，同题跑通端到端（gpt-audio，可切 Step-Audio R1）与级联"
+                    "（whisper-1 → gpt-4o-mini → tts-1），打印真实延迟与信息损失对照。",
+        epilog="示例：\n"
+               "  python demo.py                               # 默认：数学题，端到端+级联对照\n"
+               "  python demo.py --task paralinguistic         # 副语言任务：凸显端到端优势\n"
+               "  python demo.py --audio-input my_voice.wav    # 用真实录音作输入（更能体现语气差异）\n"
+               "  python demo.py --e2e-model gpt-audio --voice nova --output-dir out\n"
+               "  python demo.py --step-audio-endpoint http://localhost:8000/v1/audio/chat",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--question", default=USER_QUESTION,
-                   help="自定义口述提问（默认为一道 Spoken-MQA 风格的多步数学题）。")
+    p.add_argument("--task", choices=sorted(TASKS), default="math",
+                   help="任务类型：math=口述数学题（语义任务，主看延迟）；"
+                        "paralinguistic=副语言任务（答案取决于「怎么说」，凸显端到端"
+                        "对级联的优势）。默认 math。")
+    p.add_argument("--question", default=None,
+                   help="自定义口述提问文本，覆盖 --task 的默认题目。与 --audio-input 互斥。")
+    p.add_argument("--audio-input", metavar="FILE", default=None,
+                   help="直接用一段已有的音频文件（.wav/.mp3）作为输入，跳过 TTS 合成"
+                        "提问；适合喂真实带情绪的录音。与 --question 互斥。")
+    p.add_argument("--e2e-model", default=None,
+                   help="端到端 speech-to-speech 模型名（默认取环境变量 E2E_MODEL，"
+                        "再默认 gpt-audio）。")
+    p.add_argument("--step-audio-endpoint", default=None,
+                   help="自部署的 Step-Audio R1 服务地址；给定后端到端一路改走它"
+                        "（覆盖环境变量 STEP_AUDIO_ENDPOINT）。")
+    p.add_argument("--voice", default="alloy",
+                   help="回答语音音色（端到端与级联 TTS 共用，默认 alloy）。")
+    p.add_argument("--output-dir", metavar="DIR", default=None,
+                   help="音频输出目录（默认为脚本同级的 audio/）。")
     p.add_argument("--skip-cascade", action="store_true",
                    help="只跑端到端，不跑级联对照基线。")
-    return p.parse_args()
+    args = p.parse_args()
+    if args.question and args.audio_input:
+        p.error("--question 与 --audio-input 互斥，请二选一。")
+    return args
 
 
 def main() -> int:
     args = parse_args()
-    question = args.question
+    task = args.task
+    task_cfg = TASKS[task]
+    question = args.question or task_cfg["question"]
 
     load_dotenv(HERE / ".env")
 
@@ -176,25 +255,41 @@ def main() -> int:
 
     # timeout + 自动重试：单次网络/SSL 抖动不至于让整条流水线崩溃
     client = OpenAI(api_key=api_key, timeout=120.0, max_retries=3)
-    AUDIO_DIR.mkdir(exist_ok=True)
-    question_audio = str(AUDIO_DIR / "user_question.mp3")
-    e2e_audio = str(AUDIO_DIR / "answer_end_to_end.wav")
-    cascade_audio = str(AUDIO_DIR / "answer_cascade.mp3")
+    out_dir = Path(args.output_dir) if args.output_dir else AUDIO_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    e2e_audio = str(out_dir / "answer_end_to_end.wav")
+    cascade_audio = str(out_dir / "answer_cascade.mp3")
 
-    # -- 步骤 1：合成「用户提问」语音（两条管道共同输入） ----------------------
+    # -- 步骤 1：准备「用户提问」语音（两条管道共同输入） ----------------------
     print(hr("="))
-    print("步骤 1：用 TTS 合成一段「用户提问」语音（作为两条管道共同的输入）")
+    print(f"步骤 1：准备一段「用户提问」语音（任务={task}，作为两条管道共同的输入）")
     print(hr("="))
-    print(f"提问文本：{question}")
-    synthesize_question_audio(client, question, question_audio)
-    print(f"已生成输入音频：{question_audio}")
+    if args.audio_input:
+        question_audio = args.audio_input
+        if not Path(question_audio).is_file():
+            print(f"错误：--audio-input 指定的音频文件不存在：{question_audio}",
+                  file=sys.stderr)
+            return 1
+        print(f"使用已有输入音频（跳过 TTS 合成）：{question_audio}")
+        print("提问文本：（未知，来自音频文件，将由级联的 ASR 转写还原）")
+    else:
+        question_audio = str(out_dir / "user_question.mp3")
+        print(f"提问文本：{question}")
+        synthesize_question_audio(client, question, question_audio)
+        print(f"已用 TTS 合成输入音频：{question_audio}")
     print(f"ffprobe 校验：{ffprobe_info(question_audio)}")
 
     # -- 步骤 2：端到端语音思考（真实跑通） -----------------------------------
     print("\n" + hr("="))
     print("步骤 2：端到端语音思考（音频进 → 单模型 → 音频出）")
     print(hr("="))
-    e2e_model = EndToEndSpeechModel(client)
+    e2e_model = EndToEndSpeechModel(
+        client,
+        model=args.e2e_model,
+        voice=args.voice,
+        system_prompt=task_cfg["e2e_prompt"],
+        endpoint=args.step_audio_endpoint,
+    )
     backend = e2e_model.backend
     if backend == "step-audio-r1":
         print(f"检测到 STEP_AUDIO_ENDPOINT={e2e_model.endpoint}，走真实 Step-Audio R1。")
@@ -212,13 +307,17 @@ def main() -> int:
     # -- 步骤 3：级联流水线（对照基线） ---------------------------------------
     cascade_result = None
     if not args.skip_cascade:
-        cascaded = CascadedSpeechModel(client)
+        cascaded = CascadedSpeechModel(
+            client,
+            tts_voice=args.voice,
+            system_prompt=task_cfg["cascade_prompt"],
+        )
         cascade_result = cascaded.run(question_audio, cascade_audio)
         print_cascade_result(cascade_result)
 
     # -- 步骤 4：真实延迟对照 + 范式差异 + 表 9-1（引用） ---------------------
     if cascade_result is not None:
-        print_comparison(e2e_result, backend, cascade_result)
+        print_comparison(e2e_result, backend, cascade_result, task)
 
     print("\n完成。可试听：")
     print(f"  ffplay {e2e_audio}      # 端到端语音答案")

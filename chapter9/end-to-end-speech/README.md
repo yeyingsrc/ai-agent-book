@@ -8,6 +8,11 @@
 
 Step-Audio R1 无公开 endpoint、需多卡 GPU 部署，读者难以直接跑通。本 demo 因此用 OpenAI 的 speech-to-speech 模型 `gpt-audio` 作为**真实可跑的端到端代表**：它同样是「音频进 → 单模型 → 音频出」，一次调用就返回语音答案与其转写，中间**没有**独立的 ASR/LLM/TTS 三段。demo 让你**同题对照**端到端与级联两条真实管道，直观看到二者在**延迟**与**信息损失（语气、副语言）**上的差异——两条路的延迟都是本次运行真实测得，两段输出音频都用 `ffprobe` 校验。
 
+demo 提供两类任务（`--task`），对应书中两条对照轴：
+
+- **`math`（默认）**：口述数学题（Spoken-MQA 风格）。答案只取决于「说了什么」，级联与端到端准确率相当（对应书 9.3「自级联」一节），因此这一任务主要对照**延迟**维度。
+- **`paralinguistic`**：一句「答案取决于怎么说」的话。级联在 ASR 处把语音压成纯文本，LLM 拿到的只有字面，任何情绪判断都是**文本代理思考**（Textual Surrogate Reasoning，书中 9.3「文本代理思考问题」）——凭词汇猜情绪；端到端则直接听声学特征（语速、音调），据此回应。这一任务对照**信息损失**维度，正是书中 **MGRD（模态锚定思考蒸馏）** 要解决的核心问题。
+
 ## 原理：三种语音范式
 
 书中把语音架构分为三种范式（chapter9.md「语音架构的三种范式」）：
@@ -32,20 +37,30 @@ pip install -r requirements.txt
 cp env.example .env
 # 编辑 .env，填入有效的 OPENAI_API_KEY（需有权访问 gpt-audio / whisper-1 / tts-1 / gpt-4o-mini）
 
-# 3. 运行（默认同题跑通端到端 + 级联，并打印真实延迟对照）
+# 3. 运行（默认：math 任务，同题跑通端到端 + 级联，并打印真实延迟对照）
 python demo.py
 
-# 只跑端到端
-python demo.py --skip-cascade
+# 副语言任务：凸显端到端相对级联的优势（端到端听得到语气，级联只看到字面）
+python demo.py --task paralinguistic
 
-# 自定义提问（默认是一道 Spoken-MQA 风格的多步数学题）
+# 用真实带情绪的录音作输入（比 TTS 合成更能体现语气差异；与 --question 互斥）
+python demo.py --task paralinguistic --audio-input my_voice.wav
+
+# 只跑端到端 / 自定义提问 / 换音色 / 换输出目录
+python demo.py --skip-cascade
 python demo.py --question "从北京到上海高铁 4 小时，我 9 点出发，几点到？"
+python demo.py --voice nova --output-dir out
 python demo.py --help
+
+# 切到自部署的真实 Step-Audio R1（覆盖环境变量）
+python demo.py --step-audio-endpoint http://localhost:8000/v1/audio/chat
 
 # 4.（可选）试听生成的语音答案
 ffplay audio/answer_end_to_end.wav   # 端到端
 ffplay audio/answer_cascade.mp3      # 级联
 ```
+
+CLI 全部参数见 `python demo.py --help`：`--task`、`--question`、`--audio-input`、`--e2e-model`、`--step-audio-endpoint`、`--voice`、`--output-dir`、`--skip-cascade`。默认行为（`python demo.py` 跑 math 任务、端到端 + 级联对照）与改造前保持一致。
 
 依赖 `ffprobe`/`ffplay`（用于校验、试听音频）：`brew install ffmpeg`（macOS）。
 
@@ -70,6 +85,20 @@ ffplay audio/answer_cascade.mp3      # 级联
 【3】书中表 9-1（引自 Step-Audio R1 论文，非本 demo 产出）
     MPS Speak-First 92.8% / 完整 TBS 93.0% ……
 ```
+
+### 副语言任务的真实节选（`--task paralinguistic`，一次真实运行）
+
+同一句「行吧，那就这样吧，我没什么意见。」（TTS 合成，情感偏平），两条路的回答：
+
+```
+[阶段 1] ASR 语音识别  |  whisper-1  → 「行吧,那就这样吧,我没什么意见」   ← 级联 LLM 只拿得到这行纯文本
+
+两条路对同一段音频的回答（可直观对比是否「听到了怎么说」）：
+    级联（只凭 ASR 文本，文本代理思考）→ 「听起来你有些无奈，可能对这个决定不太满意。……」
+    端到端（直接听声学特征）        → 「听起来你有点无奈，语速不快，音调挺平稳的。……」
+```
+
+差异一目了然：**级联**只能从字面「没什么意见」猜出无奈，说不出任何声学依据（书中「文本代理思考」）；**端到端**则直接引用了「语速不快、音调平稳」这类声学特征——这正是书中 MGRD 想让模型学会的「用耳朵思考」。注意默认输入是 TTS 合成、情感偏平，差异已被削弱；用 `--audio-input` 喂一段真实带情绪的录音，对照会更明显。
 
 **关于表 9-1**：demo 里打印的 Spoken-MQA / URO-Bench 分数是**引自 Step-Audio R1 论文**（书中表 9-1 转引），并非本 demo 跑出来的——本 demo 真实产出的只有实测延迟与两段真实音频。延迟数字随网络与 OpenAI 负载波动；`gpt-audio` 是「一次前向出整段音频」，真流式的端到端（如 Step-Audio R1 的 MPS）还能「边想边说」把**首字延迟**进一步压低，这一点非本 demo 的整段延迟所能体现。
 

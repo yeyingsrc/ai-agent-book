@@ -84,11 +84,14 @@ class EndToEndSpeechModel:
         model: Optional[str] = None,
         voice: str = "alloy",
         system_prompt: Optional[str] = None,
+        endpoint: Optional[str] = None,
     ) -> None:
         self.client = client
         self.model = model or os.getenv("E2E_MODEL", "gpt-audio")
         self.voice = voice
-        self.endpoint = os.getenv("STEP_AUDIO_ENDPOINT", "").strip()
+        # 优先用显式传入的 endpoint（CLI --step-audio-endpoint），否则回落到环境变量
+        self.endpoint = (endpoint if endpoint is not None
+                         else os.getenv("STEP_AUDIO_ENDPOINT", "")).strip()
         self.system_prompt = system_prompt or (
             "你是一个中文语音助手。请先在内部完成必要的推理，再用简洁、口语化、"
             "适合朗读的中文说出结论，控制在三句话以内。"
@@ -203,12 +206,17 @@ class CascadedSpeechModel:
         llm_model: str = "gpt-4o-mini",
         tts_model: str = "tts-1",
         tts_voice: str = "alloy",
+        system_prompt: Optional[str] = None,
     ) -> None:
         self.client = client
         self.asr_model = asr_model
         self.llm_model = llm_model
         self.tts_model = tts_model
         self.tts_voice = tts_voice
+        self.system_prompt = system_prompt or (
+            "你是一个语音助手。请先进行必要的推理，再给出简洁、口语化、"
+            "适合朗读的中文回答。回答控制在三句话以内。"
+        )
 
     # -- 阶段 1：ASR 语音识别 ------------------------------------------------
     def transcribe(self, audio_path: str) -> StageResult:
@@ -232,13 +240,7 @@ class CascadedSpeechModel:
         resp = self.client.chat.completions.create(
             model=self.llm_model,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "你是一个语音助手。请先进行必要的推理，再给出简洁、口语化、"
-                        "适合朗读的中文回答。回答控制在三句话以内。"
-                    ),
-                },
+                {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": question_text},
             ],
             temperature=0.3,

@@ -8,6 +8,7 @@
     "test:asr": "mocha tests/test-asr-providers.js --timeout 120000",
     "test:llm": "mocha tests/test-llm-providers.js --timeout 120000", 
     "test:tts": "mocha tests/test-tts-providers.js --timeout 120000",
+    "check": "node check-setup.js",
     "start": "node server.js"
   },
   "keywords": [],
