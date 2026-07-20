@@ -257,7 +257,8 @@ class AttentionVisualizationAgent:
             if self.verbose:
                 logger.warning(f"Error in attention hook: {e}")
     
-    def save_trajectory(self, result: GenerationResult, query: str = None, category: str = "General") -> str:
+    def save_trajectory(self, result: GenerationResult, query: str = None, category: str = "General",
+                        temperature: float = 0.7, max_new_tokens: int = 100) -> str:
         """Save a trajectory to frontend/public/ with unique filename"""
         # Create output directory
         output_dir = Path("frontend/public/trajectories")
@@ -445,7 +446,8 @@ class AttentionVisualizationAgent:
         
         # Save trajectory if requested
         if save_trajectory:
-            self.save_trajectory(result, query=prompt, category=category)
+            self.save_trajectory(result, query=prompt, category=category,
+                                 temperature=temperature, max_new_tokens=max_new_tokens)
         
         return result
     

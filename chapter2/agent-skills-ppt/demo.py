@@ -204,14 +204,24 @@ TOOLS = [
 
 
 def dispatch(catalog: dict, name: str, args: dict, out_path: Path) -> str:
+    # 模型给的 arguments 可能缺字段（或根本不是合法 JSON，被上层回退成 {}）。
+    # 缺参时返回 [error] 让 Agent 在下一轮自我纠正，而不是抛 KeyError 中断 loop。
+    required = {
+        "read_skill": ["name"],
+        "read_skill_file": ["name", "path"],
+        "run_skill_script": ["name", "script", "payload"],
+    }
+    if name not in required:
+        return f"[error] 未知工具: {name}"
+    missing = [k for k in required[name] if k not in args]
+    if missing:
+        return f"[error] 工具 {name} 缺少参数: {', '.join(missing)}"
     if name == "read_skill":
         return tool_read_skill(catalog, args["name"])
     if name == "read_skill_file":
         return tool_read_skill_file(catalog, args["name"], args["path"])
-    if name == "run_skill_script":
-        return tool_run_skill_script(catalog, args["name"], args["script"],
-                                     args["payload"], out_path)
-    return f"[error] 未知工具: {name}"
+    return tool_run_skill_script(catalog, args["name"], args["script"],
+                                 args["payload"], out_path)
 
 
 # ---------------------------------------------------------------------------

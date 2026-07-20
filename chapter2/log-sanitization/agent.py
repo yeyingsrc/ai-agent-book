@@ -273,19 +273,21 @@ class LogSanitizationAgent:
         # Sanitize the text
         sanitized_text, replacements = self.sanitize_text(conv_text, pii_values)
         
-        # Create performance metric
+        # Create performance metric. detect_pii() returns an empty metrics dict
+        # when the LLM backend fails (e.g. Ollama not running) — fall back to
+        # zeros so one failed conversation doesn't crash the whole batch.
         metric = PerformanceMetrics(
             test_id=test_id,
             conversation_id=conv_id,
             input_text_length=len(conv_text),
-            input_tokens=perf_metrics['input_tokens'],
-            prefill_time_ms=perf_metrics['prefill_time_ms'],
-            output_time_ms=perf_metrics['output_time_ms'],
-            total_time_ms=perf_metrics['total_time_ms'],
-            output_tokens=perf_metrics['output_tokens'],
-            prefill_speed_tps=perf_metrics['prefill_speed_tps'],
-            output_speed_tps=perf_metrics['output_speed_tps'],
-            pii_items_found=perf_metrics['pii_items_found'],
+            input_tokens=perf_metrics.get('input_tokens', 0),
+            prefill_time_ms=perf_metrics.get('prefill_time_ms', 0),
+            output_time_ms=perf_metrics.get('output_time_ms', 0),
+            total_time_ms=perf_metrics.get('total_time_ms', 0),
+            output_tokens=perf_metrics.get('output_tokens', 0),
+            prefill_speed_tps=perf_metrics.get('prefill_speed_tps', 0),
+            output_speed_tps=perf_metrics.get('output_speed_tps', 0),
+            pii_items_found=perf_metrics.get('pii_items_found', 0),
             replacements_made=replacements,
             sanitized_text_length=len(sanitized_text)
         )
