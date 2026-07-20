@@ -11,7 +11,7 @@ The book is available in multiple languages:
 - **Chinese PDF (original / 中文原版)**: [`book/深入理解-AI-Agent-李博杰-v1.2.pdf`](book/深入理解-AI-Agent-李博杰-v1.2.pdf)
 - **English PDF** (community-contributed translation by [@nsdevaraj](https://github.com/nsdevaraj)): [`book-en/AI-Agents-in-Depth-Bojie-Li-v1.2.pdf`](book-en/AI-Agents-in-Depth-Bojie-Li-v1.2.pdf)
 - **Tamil PDF** (community-contributed translation by [@nsdevaraj](https://github.com/nsdevaraj)): [`book-ta/AI-Agents-in-Depth-Bojie-Li-v1.2-ta.pdf`](book-ta/AI-Agents-in-Depth-Bojie-Li-v1.2-ta.pdf)
-- **Vietnamese PDF** (community-contributed translation by [@toanalien](https://github.com/toanalien)): [`book-vi/AI-Agents-in-Depth-Bojie-Li-v1.1-vi.pdf`](book-vi/AI-Agents-in-Depth-Bojie-Li-v1.1-vi.pdf)
+- **Vietnamese PDF** (community-contributed translation by [@toanalien](https://github.com/toanalien)): [`book-vi/AI-Agents-in-Depth-Bojie-Li-v1.2-vi.pdf`](book-vi/AI-Agents-in-Depth-Bojie-Li-v1.2-vi.pdf)
 
 The Chinese original lives in [`book/`](book/). The English, Tamil, and Vietnamese translations are **community-contributed** and live in [`book-en/`](book-en/), [`book-ta/`](book-ta/), and [`book-vi/`](book-vi/) respectively; they may lag behind the Chinese original:
 

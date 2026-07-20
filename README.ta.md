@@ -11,7 +11,7 @@
 - **சீன PDF (அசல் பதிப்பு)**: [`book/深入理解-AI-Agent-李博杰-v1.2.pdf`](book/深入理解-AI-Agent-李博杰-v1.2.pdf)
 - **ஆங்கில PDF** (சமூகப் பங்களிப்பு மொழிபெயர்ப்பு, by [@nsdevaraj](https://github.com/nsdevaraj)): [`book-en/AI-Agents-in-Depth-Bojie-Li-v1.2.pdf`](book-en/AI-Agents-in-Depth-Bojie-Li-v1.2.pdf)
 - **தமிழ் PDF** (சமூகப் பங்களிப்பு மொழிபெயர்ப்பு, by [@nsdevaraj](https://github.com/nsdevaraj)): [`book-ta/AI-Agents-in-Depth-Bojie-Li-v1.2-ta.pdf`](book-ta/AI-Agents-in-Depth-Bojie-Li-v1.2-ta.pdf)
-- **வியட்நாமிய PDF** (சமூகப் பங்களிப்பு மொழிபெயர்ப்பு, by [@toanalien](https://github.com/toanalien)): [`book-vi/AI-Agents-in-Depth-Bojie-Li-v1.1-vi.pdf`](book-vi/AI-Agents-in-Depth-Bojie-Li-v1.1-vi.pdf)
+- **வியட்நாமிய PDF** (சமூகப் பங்களிப்பு மொழிபெயர்ப்பு, by [@toanalien](https://github.com/toanalien)): [`book-vi/AI-Agents-in-Depth-Bojie-Li-v1.2-vi.pdf`](book-vi/AI-Agents-in-Depth-Bojie-Li-v1.2-vi.pdf)
 
 சீன மூல உரை மற்றும் தொகுக்கப்பட்ட PDF [`book/`](book/) கோப்பகத்தில் உள்ளது; ஆங்கில, தமிழ் மற்றும் வியட்நாமிய மொழிபெயர்ப்புகள் **சமூகப் பங்களிப்புகள்** ஆகும் — அவை முறையே [`book-en/`](book-en/), [`book-ta/`](book-ta/) மற்றும் [`book-vi/`](book-vi/) கோப்பகங்களில் உள்ளன, மேலும் அவற்றின் உள்ளடக்கம் சீன அசல் பதிப்பை விடப் பின்தங்கியிருக்கலாம்:
 
