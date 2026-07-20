@@ -1,5 +1,6 @@
 """File system tools with safety mechanisms."""
 
+import itertools
 import os
 from pathlib import Path
 from typing import Dict, Any
@@ -193,7 +194,7 @@ class FileTools:
         new_lines = new_content.split('\n')
         
         diff_lines = []
-        for i, (old, new) in enumerate(zip(old_lines, new_lines), 1):
+        for i, (old, new) in enumerate(itertools.zip_longest(old_lines, new_lines, fillvalue=''), 1):
             if old != new:
                 diff_lines.append(f"Line {i}:")
                 diff_lines.append(f"  - {old}")
