@@ -861,4 +861,4 @@ This project is licensed under the [Apache License 2.0](LICENSE). See the [`LICE
   </picture>
 </a>
 
-<sub>Chart drawn by [`scripts/gen_star_history.py`](scripts/gen_star_history.py) (starting July 13, 2026) and refreshed daily by a [GitHub Actions scheduled task](.github/workflows/star-history.yml), committed to the <code>assets/</code> directory; click to view real-time data on star-history.com.</sub>
+<sub>Chart drawn by [`scripts/gen_star_history.py`](scripts/gen_star_history.py) (starting July 15, 2026) and refreshed daily by a [GitHub Actions scheduled task](.github/workflows/star-history.yml), committed to the <code>assets/</code> directory; click to view real-time data on star-history.com.</sub>

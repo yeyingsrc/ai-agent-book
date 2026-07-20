@@ -865,4 +865,4 @@ git clone https://github.com/joonspk-research/generative_agents.git    chapter10
   </picture>
 </a>
 
-<sub>விளக்கப்படம் [`scripts/gen_star_history.py`](scripts/gen_star_history.py) மூலம் உருவாக்கப்பட்டது (2026 ஜூலை 13 முதல்); [GitHub Actions திட்டமிடப்பட்ட பணி](.github/workflows/star-history.yml) ஒவ்வொரு நாளும் தானாகவே புதுப்பித்து <code>assets/</code> கோப்பகத்திற்கு commit செய்கிறது; கிளிக் செய்து star-history.com இல் நிகழ்நேரத் தரவைக் காணலாம்.</sub>
+<sub>விளக்கப்படம் [`scripts/gen_star_history.py`](scripts/gen_star_history.py) மூலம் உருவாக்கப்பட்டது (2026 ஜூலை 15 முதல்); [GitHub Actions திட்டமிடப்பட்ட பணி](.github/workflows/star-history.yml) ஒவ்வொரு நாளும் தானாகவே புதுப்பித்து <code>assets/</code> கோப்பகத்திற்கு commit செய்கிறது; கிளிக் செய்து star-history.com இல் நிகழ்நேரத் தரவைக் காணலாம்.</sub>

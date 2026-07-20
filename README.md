@@ -865,4 +865,4 @@ git clone https://github.com/joonspk-research/generative_agents.git    chapter10
   </picture>
 </a>
 
-<sub>图表由 [`scripts/gen_star_history.py`](scripts/gen_star_history.py) 绘制（自 2026 年 7 月 13 日起），[GitHub Actions 定时任务](.github/workflows/star-history.yml) 每天自动更新并提交到 <code>assets/</code> 目录；点击可跳转到 star-history.com 查看实时数据。</sub>
+<sub>图表由 [`scripts/gen_star_history.py`](scripts/gen_star_history.py) 绘制（自 2026 年 7 月 15 日起），[GitHub Actions 定时任务](.github/workflows/star-history.yml) 每天自动更新并提交到 <code>assets/</code> 目录；点击可跳转到 star-history.com 查看实时数据。</sub>
