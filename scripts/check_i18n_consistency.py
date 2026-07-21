@@ -9,10 +9,10 @@ CI 自动适配，无需改脚本。
 
 目录约定（中文为主语言）：
   - 中文主 README：仓库根目录 README.md（不放进 docs/）
-  - 其它语言主 README：docs/<locale>/README.md（如 docs/en-US/README.md）
+  - 其它语言主 README：docs/<locale>/README.md（如 docs/en/README.md）
   - 学习建议：docs/<locale>/LEARNING.md（含中文 docs/zh-CN/LEARNING.md）
   - 章节 README：中文默认 chapterN/README.md；其它语言 chapterN/README.<locale>.md
-    （ISO 639-1 + ISO 3166-1，如 README.en-US.md、README.zh-TW.md）
+    （ISO 639-1 + ISO 3166-1，如 README.en.md、README.zh-TW.md）
 
 严格规则：**只要某语言有自己的主 README，CI 就要求它完整**：
   - 10 章 chapter README（中文为 README.md，其它为 README.<locale>.md）
@@ -36,7 +36,7 @@ CHAPTERS = range(1, 11)
 
 
 def chapter_suffix(locale: str) -> str:
-    """章节 README 后缀：中文（zh-CN）默认为空 → README.md；其它如 en-US → .en-US。"""
+    """章节 README 后缀：中文（zh-CN）默认为空 → README.md；其它如 en → .en。"""
     if locale == "zh-CN":
         return ""
     return f".{locale}"
@@ -233,7 +233,7 @@ def main() -> int:
         print("  - git clone 不一致：参考 README.md 附录段同步")
         print("  - 内容速览表结构：参考 README.md 的 5 列模板")
         print("  - 语言切换栏：参考 README.md 顶部，加入 docs/<locale>/README.md 链接")
-        print("  - 章节 README 命名：中文为 README.md，其它为 README.<locale>.md（如 README.en-US.md）")
+        print("  - 章节 README 命名：中文为 README.md，其它为 README.<locale>.md（如 README.en.md）")
         return 1
     print("✓ 所有语言版本结构一致/完整")
     return 0

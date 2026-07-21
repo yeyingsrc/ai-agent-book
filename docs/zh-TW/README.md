@@ -2,7 +2,7 @@
 
 [![Stars](https://img.shields.io/github/stars/bojieli/ai-agent-book?style=social)](https://github.com/bojieli/ai-agent-book) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](../../LICENSE) [![PDF](https://img.shields.io/badge/PDF-%E4%B8%8B%E8%BD%BD-success.svg)](#-電子書) [![Languages](https://img.shields.io/badge/翻譯-5%20種%20語言-informational.svg)](#-電子書)
 
-**[中文](../../README.md) · 台灣正體 ← 當前 · [English](../en-US/README.md) · [Tiếng Việt](../vi-VN/README.md) · [தமிழ்](../ta-IN/README.md)**
+**[中文](../../README.md) · 台灣正體 ← 當前 · [English](../en/README.md) · [Tiếng Việt](../vi/README.md) · [தமிழ்](../ta/README.md)**
 
 **Agent = LLM + 上下文 + 工具**——本書圍繞這個核心公式，用 10 章把 AI Agent 從原理講到工程實戰。全書正文、配圖、**88 個配套實驗**全部開源，歡迎親手把實驗跑一遍。
 
@@ -52,7 +52,6 @@
 | 8 | 🔄 **Agent 的自我進化** | 不改權重也能成長：經驗學習、從工具使用者到創造者 | [讀](../../book-zhtw/chapter8.zhtw.md) | [6](../../chapter8/README.zh-TW.md) |
 | 9 | 🎙️ **多模態與即時互動** | 從文字擴充套件到語音、GUI、物理世界：語音三典範、Computer Use、機器人 | [讀](../../book-zhtw/chapter9.zhtw.md) | [7](../../chapter9/README.zh-TW.md) |
 | 10 | 🤝 **多 Agent 協作** | 群體智慧高於個體：協作框架、上下文共享/隔離、湧現的「Agent 社會」 | [讀](../../book-zhtw/chapter10.zhtw.md) | [6](../../chapter10/README.zh-TW.md) |
-
 
 > 💡 **讀** = 在 GitHub 網頁直接讀章節正文（markdown）；**N** = 該章配套專案數，點選檢視程式碼。專案型別說明（✅ 可執行 / 📖 復現 / 🚧 設計）見各章 README。
 >
