@@ -1,0 +1,70 @@
+name: Build latest book artifacts
+
+# Rebuilds the PDF and EPUB editions whenever the book sources change and
+# uploads them to the rolling "latest" pre-release (assets are overwritten in
+# place, so the download URLs stay stable). Versioned releases (v1.2, ...) are
+# still cut manually at milestones.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'book/**'
+      - 'book-zhtw/**'
+      - 'book-en/**'
+      - 'book-ta/**'
+      - 'book-vi/**'
+      - 'build_epub.sh'
+      - 'epub.css'
+      - 'flatten_epub_toc.py'
+      - '.github/workflows/build-latest.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-latest
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          brew install pandoc poppler librsvg
+          brew install --cask mactex-no-gui
+          echo "/Library/TeX/texbin" >> "$GITHUB_PATH"
+
+      - name: Build PDFs
+        run: |
+          set -e
+          for dir in book book-zhtw book-en book-vi; do
+            (cd "$dir" && bash build_pdf.sh)
+          done
+          # book-ta has no build script (contributed PDF); the repo copy is
+          # uploaded as-is below.
+
+      - name: Build EPUBs
+        run: ./build_epub.sh all
+
+      - name: Upload to the rolling latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          out="$(mktemp -d)"
+          cp "book/深入理解-AI-Agent-李博杰-v1.2.pdf"              "$out/AI-Agents-in-Depth-zh-CN.pdf"
+          cp "book-zhtw/深入理解-AI-Agent-李博杰-v1.2-zhtw.pdf"   "$out/AI-Agents-in-Depth-zh-TW.pdf"
+          cp book-en/AI-Agents-in-Depth-Bojie-Li-v1.2.pdf        "$out/AI-Agents-in-Depth-en.pdf"
+          cp book-ta/AI-Agents-in-Depth-Bojie-Li-v1.2-ta.pdf     "$out/AI-Agents-in-Depth-ta.pdf"
+          cp book-vi/AI-Agents-in-Depth-Bojie-Li-v1.2-vi.pdf     "$out/AI-Agents-in-Depth-vi.pdf"
+          cp "book/深入理解-AI-Agent-李博杰-v1.2.epub"             "$out/AI-Agents-in-Depth-zh-CN.epub"
+          cp "book-zhtw/深入理解-AI-Agent-李博杰-v1.2-zhtw.epub"   "$out/AI-Agents-in-Depth-zh-TW.epub"
+          cp book-en/AI-Agents-in-Depth-Bojie-Li-v1.2.epub       "$out/AI-Agents-in-Depth-en.epub"
+          cp book-ta/AI-Agents-in-Depth-Bojie-Li-v1.2-ta.epub    "$out/AI-Agents-in-Depth-ta.epub"
+          cp book-vi/AI-Agents-in-Depth-Bojie-Li-v1.2-vi.epub    "$out/AI-Agents-in-Depth-vi.epub"
+          gh release upload latest "$out"/* --clobber --repo "${{ github.repository }}"

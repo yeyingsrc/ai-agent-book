@@ -636,6 +636,18 @@ Step 5: Verification
 
 从 Claude Code 的工具定义中可以观察到，每个工具描述都精心设计了使用边界（“NEVER invoke grep or rg as a Bash command”）、具体示例（`timezone: 'America/New_York'`）、性能提示（“Batch your tool calls together”）以及工具间的协作关系（“Use the Read tool at least once before editing”）。工具定义的设计原则和最佳实践将在第四章详细展开。
 
+最后需要补充的是，“工具定义与系统提示词一起构成静态前缀”描述的是基础模式，也是多数 LLM API 的默认行为——`tools` 字段随请求发送，由服务商随前缀一起缓存。但 2026 年以来，工具定义本身也在向本章 Skills 式的“渐进式披露”演进，且已经是 API 层的原生能力而非框架补丁：OpenAI Responses API 提供 `tool_search` 工具和 `defer_loading: true` 标记[^ch2-toolsearch-oai]，模型通过 `tool_search_call` → `tool_search_output` 按需加载工具的完整 schema；Anthropic 侧的对应物是 Tool Search（`tool_reference` blocks），Claude Code 对 MCP 工具默认延迟加载——会话启动时只注入工具名称和服务器说明，完整 schema 待模型搜索到之后才注入[^ch2-toolsearch-cc]；Codex CLI 的 `tool_search`（BM25 检索）则不是可选特性，而是默认开启的架构[^ch2-toolsearch-codex]。这些机制的共同点与 Skills 的“方式三”完全一致：静态前缀里只保留工具的名称和简述，完整 schema 在模型按需请求后**追加到上下文末尾**，成为轨迹的一部分。
+
+[^ch2-toolsearch-oai]: OpenAI, "Tool search", Responses API 文档. https://developers.openai.com/api/docs/guides/tools-tool-search
+[^ch2-toolsearch-cc]: Anthropic, "Scale with MCP tool search", Claude Code 文档. https://code.claude.com/docs/en/mcp
+[^ch2-toolsearch-codex]: OpenAI Codex CLI 源码，`codex-rs/core/templates/search_tool/tool_description.md`——该模板告知模型：部分工具并未预先提供，需要用 `tool_search` 搜索并加载。
+
+为什么追加到末尾就不破坏缓存？这正是前文 KV Cache 前缀性质的直接推论：因果注意力决定了每个 token 的键值对只依赖它之前的 token，因此在末尾追加新内容不会改变任何已缓存 token 的 K、V——新增的工具 schema 只需在首次出现时计算一次（一次性的缓存写入），此后就并入不断增长的“前缀”，在后续所有轮次持续命中。所以这不是“预编译”，而是“只增不改”的追加式注入。
+
+这里有一个容易误解的点值得澄清：“追加到末尾”只发生在工具被发现的那一轮。此后这个 schema 块就固定在轨迹中的原位置——后续轮次的新消息追加在它**之后**，它本身成为普通的历史消息，而不是每轮都被重新搬运到最新的末尾（倘若真是每轮重新注入，那确实每轮都要为它重新 prefill，缓存也就失去了意义）。两个 API 的实现都保证了这一点：OpenAI 要求后续请求保持 `tool_search_output` 项的原位置，且同一工具无需在后续轮次重复加载；Anthropic 在会话历史的原位置内联展开 `tool_reference` block，官方文档明确表示后续每一轮都能保持缓存命中。真正会导致重算的只有两种情况：Prompt Cache 的 TTL 过期（整段前缀一起重算，并非工具定义特有的代价），以及修改、移除或重排已加载的工具集（缓存从变动点起失效）。
+
+这套机制的另一条约束是模型能力：模型必须在训练中见过“工具定义出现在对话中间”这种模式——这也是该能力目前只有较新模型（如 GPT-5.4+、Claude 4.5 系列）支持、且在自托管开源模型上需要专门训练的原因。工具发现的完整讨论见第四章“主动工具发现”一节。
+
 > **实验 2-4 ★★：提示工程的消融实验**
 >
 > 为了科学地验证提示工程各要素的贡献，`prompt-engineering` 项目基于 Tau-Bench 框架设计了系统的消融实验（Ablation Study）。Tau-Bench 模拟了航空公司客服和零售客户支持两个真实的场景，Agent 需要处理航班改签、退款处理、库存查询等复杂的多步骤任务。

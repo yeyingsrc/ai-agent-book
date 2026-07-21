@@ -1,27 +1,27 @@
 # 第 2 章 · 上下文工程
 
-> 上下文决定能力上限：KV Cache、提示工程、Agent Skills、上下文压缩
+> 上下文決定能力上限：KV Cache、提示工程、Agent Skills、上下文壓縮
 
-← [返回主目录](../README.md) · 📖 [读本章正文](../book/chapter2.md)
+← [返回主目錄](../README.md) · 📖 [讀本章正文](../book/chapter2.md)
 
-## 配套项目
+## 配套專案
 
-| 项目 | 类型 | 一句话说明 |
+| 專案 | 型別 | 一句話說明 |
 | --- | :--: | --- |
-| [local_llm_serving](local_llm_serving/) | ✅ | 跨平台本地 LLM 部署，自动选 vLLM/Ollama 后端，展示 0.6B 小模型也能有出色工具调用 |
-| [attention_visualization](attention_visualization/) | ✅ | 可视化 LLM 完整 token 序列与注意力权重分布，理解模型如何处理上下文、推理与调用工具 |
-| [kv-cache](kv-cache/) | ✅ | 探索不同上下文管理模式对 KV Cache 的影响，演示错误模式如何破坏缓存效率 |
-| [context-compression](context-compression/) | ✅ | 实现并对比摘要、关键信息提取、语义压缩等多种策略，保持能力的同时减少 token |
-| [prompt-engineering](prompt-engineering/) | ✅ | 扩展 Tau-Bench，量化语气风格、指令组织、工具描述等因素对任务完成率的影响 |
-| [system-hint](system-hint/) | ✅ | 研究系统提示对 Agent 行为的影响，探索如何通过优化系统提示提升性能 |
-| [log-sanitization](log-sanitization/) | ✅ | 智能日志脱敏系统，在保留调试信息的同时保护敏感数据 |
-| [prompt-injection](prompt-injection/) | ✅ | 3 种攻击场景 × 4 种防御配置的对照实验，直观展示逐层叠加防御后注入成功率下降 |
-| [agent-skills-ppt](agent-skills-ppt/) | ✅ | 复现 Agent Skills「渐进式披露」，按需加载完整流程后用 python-pptx 生成真实 `.pptx` |
+| [local_llm_serving](local_llm_serving/) | ✅ | 跨平台本地 LLM 部署，自動選 vLLM/Ollama 後端，展示 0.6B 小模型也能有出色工具呼叫 |
+| [attention_visualization](attention_visualization/) | ✅ | 視覺化 LLM 完整 token 序列與注意力權重分佈，理解模型如何處理上下文、推理與呼叫工具 |
+| [kv-cache](kv-cache/) | ✅ | 探索不同上下文管理模式對 KV Cache 的影響，示範錯誤模式如何破壞快取效率 |
+| [context-compression](context-compression/) | ✅ | 實作並對比摘要、關鍵資訊擷取、語意壓縮等多種策略，保持能力的同時減少 token |
+| [prompt-engineering](prompt-engineering/) | ✅ | 擴充 Tau-Bench，量化語氣風格、指令組織、工具描述等因素對任務完成率的影響 |
+| [system-hint](system-hint/) | ✅ | 研究系統提示對 Agent 行為的影響，探索如何透過最佳化系統提示提升效能 |
+| [log-sanitization](log-sanitization/) | ✅ | 智慧日誌脫敏系統，在保留除錯資訊的同時保護敏感資料 |
+| [prompt-injection](prompt-injection/) | ✅ | 3 種攻擊場景 × 4 種防禦設定的對照實驗，直觀展示逐層疊加防禦後注入成功率下降 |
+| [agent-skills-ppt](agent-skills-ppt/) | ✅ | 復現 Agent Skills「漸進式揭露」，按需載入完整流程後用 python-pptx 產生真實 `.pptx` |
 
-## 项目类型说明
+## 專案型別說明
 
-| 图标 | 类型 | 含义 |
+| 圖示 | 型別 | 含義 |
 | :--: | --- | --- |
-| ✅ | **可独立运行** | 本仓库自带完整代码，配置好 API Key 即可运行 |
-| 📖 | **复现指南** | 依赖需自行 `git clone` 的**外部仓库**（训练框架、评测基准等） |
-| 🚧 | **设计文档** | 仅包含架构与实现方案，可运行代码仍在完善中 |
+| ✅ | **可獨立執行** | 本倉庫自帶完整程式碼，設定好 API Key 即可執行 |
+| 📖 | **復現指南** | 依賴需自行 `git clone` 的**外部倉庫**（訓練框架、評測基準等） |
+| 🚧 | **設計文件** | 僅包含架構與實作方案，可執行程式碼仍在完善中 |

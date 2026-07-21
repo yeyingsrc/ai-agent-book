@@ -1,25 +1,24 @@
-# 第 8 章 · Agent 的自我进化
+# 第 8 章 · Agent 的自我進化
 
-> 不改权重也能成长：经验学习、主动工具发现、从使用者到创造者
+> 不改權重也能成長：經驗學習、從工具使用者到創造者
 
-← [返回主目录](../README.md) · 📖 [读本章正文](../book/chapter8.md)
+← [返回主目錄](../README.md) · 📖 [讀本章正文](../book/chapter8.md)
 
-## 配套项目
+## 配套專案
 
-| 项目 | 类型 | 一句话说明 |
+| 專案 | 型別 | 一句話說明 |
 | --- | :--: | --- |
-| [gaia-experience](gaia-experience/) | ✅ | 基于 AWorld + GAIA 的「学习-应用」闭环：自动总结成功轨迹为结构化经验，新任务中检索应用 |
-| [browser-use-rpa](browser-use-rpa/) | ✅ | 浏览器工作流录制系统，把重复操作封装为参数化工具，从 LLM 推理切换到自动化执行 3–5 倍加速 |
-| [prompt-distillation](prompt-distillation/) | ✅ | 将复杂提示的效果蒸馏进模型参数，减少推理提示长度，把上下文经验固化为参数化知识 |
-| [prompt-auto-optimization](prompt-auto-optimization/) | ✅ | 以 tau-bench 航空客服「过度转接」为例，Coding Agent 读/改 prompt 文件 → 重新评测 → 验证闭环 |
-| [active-tool-discovery](active-tool-discovery/) | ✅ | 对比「全量注入 120+ 工具 schema」与「少量基础工具 + discover_tools 元工具按需检索」，省 token 防错选 |
-| [self-evolving-tools](self-evolving-tools/) | ✅ | Alita 式「最小预定义，最大自我进化」：五个通用元工具，自己上网找库/读文档/沙箱测试并封装复用 |
-| [self-evolution-eval](self-evolution-eval/) | ✅ | 20 个跨领域任务 + 四层分层验证 harness + 可控参考 Agent，考察发现/创造/复用质量 |
+| [gaia-experience](gaia-experience/) | ✅ | 基於 AWorld + GAIA 的「學習-應用」閉環：自動總結成功軌跡為結構化經驗，在新任務中檢索應用 |
+| [browser-use-rpa](browser-use-rpa/) | ✅ | 瀏覽器工作流錄製系統，把重複操作封裝為引數化工具，從 LLM 推理切換到自動化執行可加速 3–5 倍 |
+| [prompt-distillation](prompt-distillation/) | ✅ | 將複雜提示的效果蒸餾進模型引數，減少推理提示長度，把上下文經驗固化為引數化知識 |
+| [prompt-auto-optimization](prompt-auto-optimization/) | ✅ | 以 tau-bench 航空客服「過度轉接」為例，Coding Agent 讀/改 prompt 檔案 → 重新評測 → 驗證閉環 |
+| [self-evolving-tools](self-evolving-tools/) | ✅ | Alita 式「最小預定義，最大自我進化」：五個通用元工具，自己上網找庫/讀文件/沙箱測試並封裝複用 |
+| [self-evolution-eval](self-evolution-eval/) | ✅ | 20 個跨領域任務 + 四層分層驗證 harness + 可控參考 Agent，考察發現/創造/複用品質 |
 
-## 项目类型说明
+## 專案型別說明
 
-| 图标 | 类型 | 含义 |
+| 圖示 | 型別 | 含義 |
 | :--: | --- | --- |
-| ✅ | **可独立运行** | 本仓库自带完整代码，配置好 API Key 即可运行 |
-| 📖 | **复现指南** | 依赖需自行 `git clone` 的**外部仓库**（训练框架、评测基准等） |
-| 🚧 | **设计文档** | 仅包含架构与实现方案，可运行代码仍在完善中 |
+| ✅ | **可獨立執行** | 本倉庫自帶完整程式碼，配置好 API Key 即可執行 |
+| 📖 | **復現指南** | 依賴需自行 `git clone` 的**外部倉庫**（訓練框架、評測基準等） |
+| 🚧 | **設計文件** | 僅包含架構與實現方案，可執行程式碼仍在完善中 |

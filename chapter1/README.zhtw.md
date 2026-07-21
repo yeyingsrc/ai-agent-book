@@ -1,22 +1,22 @@
-# 第 1 章 · Agent 基础知识
+# 第 1 章 · Agent 基礎知識
 
-> 「模型即 Agent」新范式 + **Agent = LLM + 上下文 + 工具**；Harness 工程才是竞争力
+> 「模型即 Agent」新典範 + **Agent = LLM + 上下文 + 工具**；Harness 工程才是競爭力
 
-← [返回主目录](../README.md) · 📖 [读本章正文](../book/chapter1.md)
+← [返回主目錄](../README.md) · 📖 [讀本章正文](../book/chapter1.md)
 
-## 配套项目
+## 配套專案
 
-| 项目 | 类型 | 一句话说明 |
+| 專案 | 型別 | 一句話說明 |
 | --- | :--: | --- |
-| [learning-from-experience](learning-from-experience/) | ✅ | 对比 Q-learning 与基于 LLM 的上下文学习，复现 Shunyu Yao 的 "The Second Half"：LLM 以 250–400 倍样本效率超越传统 RL |
-| [web-search-agent](web-search-agent/) | ✅ | Kimi K2 模型即 Agent，具备基础深度搜索能力，能进行多轮搜索和信息整合 |
-| [search-codegen](search-codegen/) | ✅ | GPT-5 原生工具集成，综合利用网络搜索与代码沙盒实现复杂分析 |
-| [context](context/) | ✅ | 系统性消融实验展示 Agent 上下文各组件的重要性；支持 SiliconFlow Qwen、字节 Doubao、月之暗面 Kimi 等多提供商 |
+| [learning-from-experience](learning-from-experience/) | ✅ | 對比 Q-learning 與基於 LLM 的上下文學習，復現 Shunyu Yao 的 "The Second Half"：LLM 以 250–400 倍樣本效率超越傳統 RL |
+| [web-search-agent](web-search-agent/) | ✅ | Kimi K2 模型即 Agent，具備基礎深度搜尋能力，能進行多輪搜尋和資訊整合 |
+| [search-codegen](search-codegen/) | ✅ | GPT-5 原生工具整合，綜合利用網路搜尋與程式碼沙箱實現複雜分析 |
+| [context](context/) | ✅ | 系統性消融實驗展示 Agent 上下文各元件的重要性；支援 SiliconFlow Qwen、字節 Doubao、月之暗面 Kimi 等多提供商 |
 
-## 项目类型说明
+## 專案型別說明
 
-| 图标 | 类型 | 含义 |
+| 圖示 | 型別 | 含義 |
 | :--: | --- | --- |
-| ✅ | **可独立运行** | 本仓库自带完整代码，配置好 API Key 即可运行 |
-| 📖 | **复现指南** | 依赖需自行 `git clone` 的**外部仓库**（训练框架、评测基准等） |
-| 🚧 | **设计文档** | 仅包含架构与实现方案，可运行代码仍在完善中 |
+| ✅ | **可獨立執行** | 本倉庫自帶完整程式碼，配置好 API Key 即可執行 |
+| 📖 | **復現指南** | 依賴需自行 `git clone` 的**外部倉庫**（訓練框架、評測基準等） |
+| 🚧 | **設計文件** | 僅包含架構與實現方案，可執行程式碼仍在完善中 |

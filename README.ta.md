@@ -11,12 +11,12 @@
 
 ## 📖 மின்-புத்தகம்
 
-> 📥 **PDF-ஐ நேரடியாகப் பதிவிறக்கவும்** (முழு உரை, இலவசம்):
-> - **சீனம் (அசல்)**：[`深入理解-AI-Agent-李博杰-v1.2.pdf`](book/深入理解-AI-Agent-李博杰-v1.2.pdf)
-> - **பாரம்பரிய சீனம் (தைவான்)**（சமூக மொழிபெயர்ப்பு, by [@tigercosmos](https://github.com/tigercosmos)）：[`深入理解-AI-Agent-李博杰-v1.2-zhtw.pdf`](book-zhtw/深入理解-AI-Agent-李博杰-v1.2-zhtw.pdf)
-> - **ஆங்கிலம்**（சமூக மொழிபெயர்ப்பு, by [@nsdevaraj](https://github.com/nsdevaraj)）：[`AI-Agents-in-Depth-Bojie-Li-v1.2.pdf`](book-en/AI-Agents-in-Depth-Bojie-Li-v1.2.pdf)
-> - **தமிழ்**（சமூக மொழிபெயர்ப்பு, by [@nsdevaraj](https://github.com/nsdevaraj)）：[`AI-Agents-in-Depth-Bojie-Li-v1.2-ta.pdf`](book-ta/AI-Agents-in-Depth-Bojie-Li-v1.2-ta.pdf)
-> - **வியட்நாம்**（சமூக மொழிபெயர்ப்பு, by [@toanalien](https://github.com/toanalien)）：[`AI-Agents-in-Depth-Bojie-Li-v1.2-vi.pdf`](book-vi/AI-Agents-in-Depth-Bojie-Li-v1.2-vi.pdf)
+> 📥 **PDF / EPUB நேரடி பதிவிறக்கம்** (முழு உரை, இலவசம்). இந்த இணைப்புகள் எப்போதும் `main` கிளையின் சமீபத்திய கட்டமைப்பைச் சுட்டும்; நிலையான பதிப்புகளுக்கு [Releases](https://github.com/bojieli/ai-agent-book/releases) பார்க்கவும்:
+> - **சீனம் (அசல்)**：[PDF](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-zh-CN.pdf) · [EPUB](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-zh-CN.epub)
+> - **பாரம்பரிய சீனம் (தைவான்)**（சமூக மொழிபெயர்ப்பு, by [@tigercosmos](https://github.com/tigercosmos)）：[PDF](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-zh-TW.pdf) · [EPUB](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-zh-TW.epub)
+> - **ஆங்கிலம்**（சமூக மொழிபெயர்ப்பு, by [@nsdevaraj](https://github.com/nsdevaraj)）：[PDF](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-en.pdf) · [EPUB](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-en.epub)
+> - **தமிழ்**（சமூக மொழிபெயர்ப்பு, by [@nsdevaraj](https://github.com/nsdevaraj)）：[PDF](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-ta.pdf) · [EPUB](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-ta.epub)
+> - **வியட்நாம்**（சமூக மொழிபெயர்ப்பு, by [@toanalien](https://github.com/toanalien)）：[PDF](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-vi.pdf) · [EPUB](https://github.com/bojieli/ai-agent-book/releases/download/latest/AI-Agents-in-Depth-vi.epub)
 
 சீன மூல உரை [`book/`](book/)-இல் உள்ளது; 台灣正體/ஆங்/தமிழ்/வியத் பதிப்புகள் சமூகப் பங்களிப்புகள் (சீன அசலை விடப் பின்தங்கியிருக்கலாம்), [`book-zhtw/`](book-zhtw/), [`book-en/`](book-en/), [`book-ta/`](book-ta/), [`book-vi/`](book-vi/)-இல் உள்ளன.
 
@@ -45,11 +45,11 @@
 | 1 | 🚀 **ஏஜென்ட் அடிப்படைகள்** | "மாதிரியே ஏஜென்ட்" முன்னுதாரணம் + **Agent = LLM + Context + Tools**; Harness பொறியியலே உண்மையான போட்டித் திறன் | [படி](book-ta/chapter1.ta.md) | [4](chapter1/README.ta.md) |
 | 2 | 🎯 **சூழல் பொறியியல்** | சூழல் ஏஜெண்டின் திறனின் மேல் வரம்பைத் தீர்மானிக்கிறது: KV Cache, prompt engineering, Agent Skills, சூழல் சுருக்கம் | [படி](book-ta/chapter2.ta.md) | [9](chapter2/README.ta.md) |
 | 3 | 📚 **பயனர் நினைவகம் & அறிவுத் தளம்** | பயனரை அமர்வுகளுக்கு குறுக்கே நினைவில் வைத்தல் + வெளிப்புற அறிவு: பயனர் நினைவகம், RAG, கட்டமைக்கப்பட்ட குறியீடு, அறிவு வரைபடம் | [படி](book-ta/chapter3.ta.md) | [13](chapter3/README.ta.md) |
-| 4 | 🛠️ **கருவிகள்** | கருவிகள் ஏஜெண்டின் கைகள்: MCP நெறிமுறை, உணர்வு/செயலாக்கம்/ஒத்துழைப்பு, நிகழ்வு-இயக்கிய ஏஜென்ட் | [படி](book-ta/chapter4.ta.md) | [6](chapter4/README.ta.md) |
+| 4 | 🛠️ **கருவிகள்** | கருவிகள் ஏஜெண்டின் கைகள்: MCP நெறிமுறை, உணர்வு/செயலாக்கம்/ஒத்துழைப்பு, நிகழ்வு-இயக்கிய ஏஜென்ட், முனைப்பான கருவி கண்டுபிடிப்பு | [படி](book-ta/chapter4.ta.md) | [7](chapter4/README.ta.md) |
 | 5 | 💻 **Coding Agent & குறியீடு உருவாக்கம்** | குறியீடு "புதிய கருவியை உருவாக்கும் கருவி"; உற்பத்தி தர Coding Agent முழுமையாக | [படி](book-ta/chapter5.ta.md) | [12](chapter5/README.ta.md) |
 | 6 | 🎯 **ஏஜென்ட் மதிப்பீடு** | செயல்திறனை ஒப்பிடக்கூடிய சமிக்ஞையாக மாற்று: சூழல்கள், அளவீடுகள், புள்ளியியல் முக்கியத்துவம், மதிப்பீடு-இயக்கிய தேர்வு | [படி](book-ta/chapter6.ta.md) | [10](chapter6/README.ta.md) |
 | 7 | 🧠 **மாதிரி பிந்தைய பயிற்சி** | Pre-training/SFT/RL மூன்று நிலைகள்: SFT vs RL, கருவி அழைப்பை உள்ளடக்குதல், மாதிரி செயல்திறன் | [படி](book-ta/chapter7.ta.md) | [14](chapter7/README.ta.md) |
-| 8 | 🔄 **ஏஜென்ட் சுய-பரிணாமம்** | எடைகளை மாற்றாமல் வளர்தல்: அனுபவத்திலிருந்து கற்றல், செயலில் கருவி கண்டறிதல், பயனரிலிருந்து உருவாக்குநர் | [படி](book-ta/chapter8.ta.md) | [7](chapter8/README.ta.md) |
+| 8 | 🔄 **ஏஜென்ட் சுய-பரிணாமம்** | எடைகளை மாற்றாமல் வளர்தல்: அனுபவத்திலிருந்து கற்றல், பயனரிலிருந்து உருவாக்குநர் | [படி](book-ta/chapter8.ta.md) | [6](chapter8/README.ta.md) |
 | 9 | 🎙️ **பல்முக & நிகழ்நேர இடைவினை** | உரையிலிருந்து குரல், GUI, பௌதீக உலகம்: மூன்று குரல் முன்னுதாரணங்கள், Computer Use, ரோபோட்டிக்ஸ் | [படி](book-ta/chapter9.ta.md) | [7](chapter9/README.ta.md) |
 | 10 | 🤝 **பல-ஏஜென்ட் ஒத்துழைப்பு** | கூட்டு நுண்ணறிவு > தனிப்பட்டது: ஒத்துழைப்பு கட்டமைப்பு, சூழல் பகிர்வு/தனிமைப்படுத்தல், "ஏஜென்ட் சமூகம்" | [படி](book-ta/chapter10.ta.md) | [6](chapter10/README.ta.md) |
 

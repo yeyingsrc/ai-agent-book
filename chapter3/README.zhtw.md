@@ -1,31 +1,31 @@
-# 第 3 章 · 用户记忆和知识库
+# 第 3 章 · 使用者記憶和知識庫
 
-> 跨会话记住用户、接入外部知识：用户记忆、RAG、结构化索引、知识图谱
+> 跨會話記住使用者、接入外部知識：使用者記憶、RAG、結構化索引、知識圖譜
 
-← [返回主目录](../README.md) · 📖 [读本章正文](../book/chapter3.md)
+← [返回主目錄](../README.md) · 📖 [讀本章正文](../book/chapter3.md)
 
-## 配套项目
+## 配套專案
 
-| 项目 | 类型 | 一句话说明 |
+| 專案 | 型別 | 一句話說明 |
 | --- | :--: | --- |
-| [user-memory](user-memory/) | ✅ | 长期用户记忆系统，让 Agent 记住偏好与历史交互、提供个性化服务 |
-| [mem0](mem0/) · [memobase](memobase/) | ✅ | 用 mem0、Memobase 两个开源框架各实现一版用户记忆，作为实验 3-2 的对照实现 |
-| [user-memory-evaluation](user-memory-evaluation/) | ✅ | 系统化评估用户记忆系统的准确性、相关性和有效性 |
-| [dense-embedding](dense-embedding/) | ✅ | 向量相似性搜索服务，对比 ANNOY（树）与 HNSW（图）两种 ANN 算法的权衡 |
-| [sparse-embedding](sparse-embedding/) | ✅ | 从零实现基于 BM25 的稀疏向量搜索引擎，可视化内部工作机制 |
-| [retrieval-pipeline](retrieval-pipeline/) | ✅ | 稠密 + 稀疏 + 神经重排序的完整流水线，用测试用例展示混合检索的互补效果 |
-| [multimodal-agent](multimodal-agent/) | ✅ | 对比原生多模态、提取为文本、工具化分析三种策略在保真度/成本/灵活性上的权衡 |
-| [structured-index](structured-index/) | ✅ | 实现并对比 RAPTOR（递归抽象树）与 GraphRAG（知识图谱）两种结构化索引 |
-| [agentic-rag](agentic-rag/) | ✅ | 对比 Non-Agentic 与 Agentic RAG，展示 ReAct 主导的迭代检索在司法问答上的优势 |
-| [agentic-rag-for-user-memory](agentic-rag-for-user-memory/) | ✅ | 用 Agentic RAG 管理用户对话历史，实现跨会话记忆检索 |
-| [contextual-retrieval](contextual-retrieval/) | ✅ | 实现 Anthropic 的上下文感知检索，为分块生成前缀摘要，失败率降低 49–67% |
-| [contextual-retrieval-for-user-memory](contextual-retrieval-for-user-memory/) | ✅ | 结合 Advanced JSON Cards 与上下文感知 RAG，形成双层记忆结构实现主动服务 |
-| [structured-knowledge-extraction](structured-knowledge-extraction/) | ✅ | 以司法判例跑通「因子发现 → 聚类原型 → 对话式建议」三段流水线 |
+| [user-memory](user-memory/) | ✅ | 長期使用者記憶系統，讓 Agent 記住偏好與歷史互動、提供個性化服務 |
+| [mem0](mem0/) · [memobase](memobase/) | ✅ | 用 mem0、Memobase 兩個開源框架各實現一版使用者記憶，作為實驗 3-2 的對照實現 |
+| [user-memory-evaluation](user-memory-evaluation/) | ✅ | 系統化評估使用者記憶系統的準確性、相關性和有效性 |
+| [dense-embedding](dense-embedding/) | ✅ | 向量相似性搜尋服務，對比 ANNOY（樹）與 HNSW（圖）兩種 ANN 演算法的權衡 |
+| [sparse-embedding](sparse-embedding/) | ✅ | 從零實現基於 BM25 的稀疏向量搜尋引擎，視覺化內部工作機制 |
+| [retrieval-pipeline](retrieval-pipeline/) | ✅ | 稠密 + 稀疏 + 神經重排序的完整流水線，用測試用例展示混合檢索的互補效果 |
+| [multimodal-agent](multimodal-agent/) | ✅ | 對比原生多模態、提取為文字、工具化分析三種策略在保真度/成本/靈活性上的權衡 |
+| [structured-index](structured-index/) | ✅ | 實現並對比 RAPTOR（遞迴抽象樹）與 GraphRAG（知識圖譜）兩種結構化索引 |
+| [agentic-rag](agentic-rag/) | ✅ | 對比 Non-Agentic 與 Agentic RAG，展示 ReAct 主導的迭代檢索在司法問答上的優勢 |
+| [agentic-rag-for-user-memory](agentic-rag-for-user-memory/) | ✅ | 用 Agentic RAG 管理使用者對話歷史，實現跨會話記憶檢索 |
+| [contextual-retrieval](contextual-retrieval/) | ✅ | 實現 Anthropic 的上下文感知檢索，為分塊生成前綴摘要，失敗率降低 49–67% |
+| [contextual-retrieval-for-user-memory](contextual-retrieval-for-user-memory/) | ✅ | 結合 Advanced JSON Cards 與上下文感知 RAG，形成雙層記憶結構實現主動服務 |
+| [structured-knowledge-extraction](structured-knowledge-extraction/) | ✅ | 以司法判例跑通「因子發現 → 聚類原型 → 對話式建議」三段流水線 |
 
-## 项目类型说明
+## 專案型別說明
 
-| 图标 | 类型 | 含义 |
+| 圖示 | 型別 | 含義 |
 | :--: | --- | --- |
-| ✅ | **可独立运行** | 本仓库自带完整代码，配置好 API Key 即可运行 |
-| 📖 | **复现指南** | 依赖需自行 `git clone` 的**外部仓库**（训练框架、评测基准等） |
-| 🚧 | **设计文档** | 仅包含架构与实现方案，可运行代码仍在完善中 |
+| ✅ | **可獨立執行** | 本倉庫自帶完整程式碼，配置好 API Key 即可執行 |
+| 📖 | **復現指南** | 依賴需自行 `git clone` 的**外部倉庫**（訓練框架、評測基準等） |
+| 🚧 | **設計文件** | 僅包含架構與實現方案，可執行程式碼仍在完善中 |
