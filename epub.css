@@ -3,7 +3,7 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  font-family: system-ui, -apple-system, "PingFang SC", "PingFang TC", "Noto Sans CJK SC", "Noto Sans CJK TC", sans-serif;
   line-height: 1.65;
   orphans: 2;
   widows: 2;

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build EPUB 3 editions from the Markdown sources.
-# Usage: ./build_epub.sh [all|zh-CN|en|ta|vi]
+# Usage: ./build_epub.sh [all|zh-CN|zh-TW|en|ta|vi]
 
 set -euo pipefail
 
@@ -15,9 +15,9 @@ for command in pandoc pdftoppm python3; do
 done
 
 case "$SELECTION" in
-    all|zh-CN|en|ta|vi) ;;
+    all|zh-CN|zh-TW|en|ta|vi) ;;
     *)
-        echo "Usage: $0 [all|zh-CN|en|ta|vi]" >&2
+        echo "Usage: $0 [all|zh-CN|zh-TW|en|ta|vi]" >&2
         exit 2
         ;;
 esac
@@ -40,6 +40,16 @@ build_edition() {
             title_label="扉页"
             toc_label="目录"
             chapters=(introduction.md chapter{1..10}.md afterword.md)
+            ;;
+        zh-TW)
+            directory="book-zhtw"
+            title="深入理解 AI Agent：設計原理與工程實踐"
+            author="李博杰；台灣正體翻譯：tigercosmos"
+            pdf="深入理解-AI-Agent-李博杰-v1.2-zhtw.pdf"
+            output="深入理解-AI-Agent-李博杰-v1.2-zhtw.epub"
+            title_label="扉頁"
+            toc_label="目錄"
+            chapters=(introduction.zhtw.md chapter{1..10}.zhtw.md afterword.zhtw.md)
             ;;
         en)
             directory="book-en"
@@ -118,7 +128,7 @@ build_edition() {
 }
 
 if [ "$SELECTION" = "all" ]; then
-    for language in zh-CN en ta vi; do
+    for language in zh-CN zh-TW en ta vi; do
         build_edition "$language"
     done
 else
