@@ -1,6 +1,15 @@
 % ===== ElegantBook customizations for 《深入理解 AI Agent》 =====
 % Accent color comes from ElegantBook's cyan theme: \structurecolor = RGB(31,186,190)
 
+% ── CJK fonts (classoption=nofont ⇒ ctex fontset=none) ────────────
+% Set explicitly instead of relying on ctex's platform auto-detection, which
+% picks the legacy ST* families (STSong/STHeiti/STKaiti). Those exist on old
+% macOS installs but NOT on current systems / GitHub macos runners, while
+% Songti TC / Heiti TC below ship with every macOS.
+\setCJKmainfont{Songti TC}
+\setCJKsansfont{Heiti TC}
+\setCJKmonofont{Songti TC}
+
 % ── Unicode glyph fallback (Times/Courier lack these) ─────────────
 \usepackage{newunicodechar}
 \newfontfamily\fallbackfont{Arial Unicode MS}
