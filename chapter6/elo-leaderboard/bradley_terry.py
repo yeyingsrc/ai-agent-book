@@ -140,7 +140,9 @@ def predict_win_rate(elo_ratings: Dict[str, float],
             wins[b][a] = 1 - ea
     
     data = {
-        a: [wins[a][b] if a != b else np.NAN for b in names]
+        # np.nan, not np.NAN: the upper-case aliases were removed in NumPy 2.0
+        # and requirements.txt allows numpy>=1.24 (i.e. 2.x).
+        a: [wins[a][b] if a != b else np.nan for b in names]
         for a in names
     }
     
