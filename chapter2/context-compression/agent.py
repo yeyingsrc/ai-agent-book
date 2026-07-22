@@ -39,6 +39,10 @@ class ToolCall:
     result: Optional[Any] = None
     compressed_result: Optional[CompressedContent] = None
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    # Provider-side tool_call id, so a tool message in the history can be
+    # matched back to the call that produced it (used by windowed compression
+    # to recover the original query).
+    id: Optional[str] = None
 
 
 @dataclass
@@ -293,7 +297,7 @@ TODAY'S DATE: {date_string}"""
                     
                     # Try to find the query from the tool call
                     for call in self.trajectory.tool_calls:
-                        if hasattr(call, 'id') and call.id == tool_call_id:
+                        if call.id is not None and call.id == tool_call_id:
                             query = call.arguments.get('query', query)
                             break
                     
@@ -559,7 +563,8 @@ TODAY'S DATE: {date_string}"""
                             tool_name=function_name,
                             arguments=function_args,
                             result=result,
-                            compressed_result=compressed
+                            compressed_result=compressed,
+                            id=tool_call['id']
                         )
                         self.trajectory.tool_calls.append(tool_call_record)
                         
