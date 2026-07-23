@@ -1,11 +1,19 @@
-# .coderabbit.yaml
+# CodeRabbit configuration for ai-agent-book
+# See https://github.com/bojieli/ai-agent-book/issues/330
+
+language: zh-CN
+
 reviews:
-  language: zh-CN              # review 用中文
   path_filters:
-    - "!**/*.lock"             # 不看 lock 文件
-    - "!**/book*/images/**"    # 不看配图
+    - "!**/*.lock"              # skip lock files
+    - "!**/book*/images/**"     # skip book figures
+    - "!**/images/**"           # skip images in general
+    - "!**/*.png"
+    - "!**/*.jpg"
+    - "!**/*.svg"
   auto_review:
     enabled: true
-    drafts: false              # draft PR 不 review
+    drafts: false               # don't review draft PRs
+
 chat:
   auto_reply: true
